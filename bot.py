@@ -83,7 +83,7 @@ def get_transcript(video_id: str) -> str:
     print(f"트랜스크립트 시도: {video_id}")
     try:
         client = ApifyClient(APIFY_TOKEN)
-        run = client.actor("streamers/youtube-transcript").call(run_input={
+        run = client.actor("topaz-group/youtube-transcript-scraper").call(run_input={
             "videoUrls": [f"https://www.youtube.com/watch?v={video_id}"],
             "language": "ko",
         })
@@ -93,7 +93,7 @@ def get_transcript(video_id: str) -> str:
             print(f"트랜스크립트 성공: {len(transcript)}자")
             return transcript
         # 한국어 없으면 영어로 재시도
-        run = client.actor("streamers/youtube-transcript").call(run_input={
+        run = client.actor("topaz-group/youtube-transcript-scraper").call(run_input={
             "videoUrls": [f"https://www.youtube.com/watch?v={video_id}"],
             "language": "en",
         })
