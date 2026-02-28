@@ -85,23 +85,30 @@ def get_transcript(video_id: str) -> str:
     print(f"트랜스크립트 시도: {video_id}")
     try:
         import requests
-        session = requests.Session()
-        session.proxies = proxies
-        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id, proxies=proxies)
-        # ko, en 우선 시도 후 첫 번째 자막으로 폴백
-        target = None
-        for lang in ["ko", "en"]:
-            try:
-                target = transcript_list.find_transcript([lang])
-                break
-            except Exception:
-                continue
-        if not target:
-            target = next(iter(transcript_list), None)
-        if target:
-            entries = target.fetch(proxies=proxies)
-            print(f"트랜스크립트 성공: {target.language_code}")
-            return " ".join(e["text"] for e in entries)
+        # requests 세션을 몽키패치로 프록시 적용
+        original_get = requests.get
+        def proxied_get(*args, **kwargs):
+            kwargs.setdefault("proxies", proxies)
+            return original_get(*args, **kwargs)
+        requests.get = proxied_get
+
+        try:
+            transcript_list = YouTubeTranscriptApi.list_transcripts(video_id, proxies=proxies)
+            target = None
+            for lang in ["ko", "en"]:
+                try:
+                    target = transcript_list.find_transcript([lang])
+                    break
+                except Exception:
+                    continue
+            if not target:
+                target = next(iter(transcript_list), None)
+            if target:
+                entries = target.fetch()
+                print(f"트랜스크립트 성공: {target.language_code}")
+                return " ".join(e["text"] for e in entries)
+        finally:
+            requests.get = original_get
     except Exception as e:
         print(f"트랜스크립트 오류: {e}")
     return ""
