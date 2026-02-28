@@ -2,17 +2,17 @@
 pip install python-telegram-bot youtube-transcript-api anthropic supabase yt-dlp
 """
 import re, asyncio, anthropic
-import os
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
 from youtube_transcript_api import YouTubeTranscriptApi
 from supabase import create_client
 
-# ── 설정 ────────────────────────────────────────────
+# ── 설정 (Railway 환경변수에서 로드) ────────────────
+import os
 TELEGRAM_TOKEN  = os.environ["TELEGRAM_TOKEN"]
-ANTHROPIC_KEY   = "YOUR_ANTHROPIC_API_KEY"
-SUPABASE_URL    = "https://steezutktgefzzirvqme.supabase.co"
-SUPABASE_KEY    = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN0ZWV6dXRrdGdlZnp6aXJ2cW1lIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjIyMjg2MCwiZXhwIjoyMDg3Nzk4ODYwfQ.b7lMXQ1wC4T1ld_UKzZXINM4oo4JEsariLnde7enY7A"
+ANTHROPIC_KEY   = os.environ["ANTHROPIC_KEY"]
+SUPABASE_URL    = os.environ["SUPABASE_URL"]
+SUPABASE_KEY    = os.environ["SUPABASE_KEY"]
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 ai       = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
@@ -162,8 +162,27 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await msg.edit_text(f"❌ 오류 발생: {e}")
 
+# ── 더미 웹서버 (Railway 종료 방지) ─────────────────
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import threading
+
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"OK")
+    def log_message(self, *args):
+        pass  # 로그 억제
+
+def run_web():
+    port = int(os.environ.get("PORT", 8080))
+    HTTPServer(("0.0.0.0", port), HealthHandler).serve_forever()
+
 # ── 실행 ─────────────────────────────────────────────
 if __name__ == "__main__":
+    # 웹서버 백그라운드 실행
+    threading.Thread(target=run_web, daemon=True).start()
+
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     print("봇 시작!")
