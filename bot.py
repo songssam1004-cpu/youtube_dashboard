@@ -8,7 +8,7 @@ from youtube_transcript_api import YouTubeTranscriptApi
 from supabase import create_client
 
 # ── 설정 ────────────────────────────────────────────
-TELEGRAM_TOKEN  = "YOUR_TELEGRAM_BOT_TOKEN"   # @BotFather에서 발급
+TELEGRAM_TOKEN  = os.environ["TELEGRAM_TOKEN"]
 ANTHROPIC_KEY   = "YOUR_ANTHROPIC_API_KEY"
 SUPABASE_URL    = "https://steezutktgefzzirvqme.supabase.co"
 SUPABASE_KEY    = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN0ZWV6dXRrdGdlZnp6aXJ2cW1lIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjIyMjg2MCwiZXhwIjoyMDg3Nzk4ODYwfQ.b7lMXQ1wC4T1ld_UKzZXINM4oo4JEsariLnde7enY7A"
