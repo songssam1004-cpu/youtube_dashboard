@@ -2,19 +2,19 @@ import streamlit as st
 from supabase import create_client
 import math
 
-# ── 설정 (Streamlit secrets에서 로드) ───────────────
+# ── 설정 ────────────────────────────────────────────
 SUPABASE_URL = st.secrets["supabase"]["url"]
 SUPABASE_KEY = st.secrets["supabase"]["anon_key"]
 COLS = 5
 ROWS = 3
-PAGE_SIZE = COLS * ROWS  # 15
+PAGE_SIZE = COLS * ROWS
 
 # ── Supabase 클라이언트 ──────────────────────────────
 @st.cache_resource
 def get_client():
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
-def fetch_summaries(page: int, search: str = "", tag: str = ""):
+def fetch_summaries(page, search="", tag=""):
     client = get_client()
     offset = (page - 1) * PAGE_SIZE
     q = client.table("youtube_summaries").select("*", count="exact")
@@ -37,35 +37,57 @@ def fetch_all_tags():
 # ── 페이지 설정 ──────────────────────────────────────
 st.set_page_config(page_title="내 유튜브 요약 대시보드", layout="wide", page_icon="🎬")
 
-# ── 전역 CSS ─────────────────────────────────────────
+# ── 전역 CSS (다크 테마) ─────────────────────────────
 st.markdown("""
 <style>
 /* 전체 배경 */
-[data-testid="stAppViewContainer"] { background: #f5f7fa; }
+[data-testid="stAppViewContainer"] {
+    background: #0f0f13;
+    color: #e0e0e0;
+}
+[data-testid="stMain"] {
+    background: #0f0f13;
+}
 
 /* 사이드바 */
 [data-testid="stSidebar"] {
-    background: #ffffff;
-    border-right: 1px solid #e8ecf0;
+    background: #1a1a24 !important;
+    border-right: 1px solid #2a2a3a;
     min-width: 220px !important;
     max-width: 220px !important;
 }
-[data-testid="stSidebar"] .stMarkdown h2 { color: #1a1a2e; }
+[data-testid="stSidebar"] * {
+    color: #e0e0e0 !important;
+}
+[data-testid="stSidebar"] .stTextInput input {
+    background: #2a2a3a !important;
+    color: #e0e0e0 !important;
+    border: 1px solid #3a3a4a !important;
+}
+[data-testid="stSidebar"] .stSelectbox select,
+[data-testid="stSidebar"] .stSelectbox > div {
+    background: #2a2a3a !important;
+    color: #e0e0e0 !important;
+}
+
+/* 헤더 */
+h1, h2, h3, h4 { color: #ffffff !important; }
+p, span, label { color: #c0c0c0 !important; }
 
 /* 카드 */
 .yt-card {
-    background: #fff;
+    background: #1e1e2a;
     border-radius: 12px;
     overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.07);
-    cursor: pointer;
-    transition: transform .18s, box-shadow .18s;
-    border: 1px solid #eef0f3;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    border: 1px solid #2a2a3a;
     height: 100%;
+    transition: transform .18s, box-shadow .18s, border-color .18s;
 }
 .yt-card:hover {
     transform: translateY(-4px);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.13);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+    border-color: #5a4fcf;
 }
 .yt-thumb {
     width: 100%;
@@ -76,7 +98,7 @@ st.markdown("""
 .yt-thumb-placeholder {
     width: 100%;
     aspect-ratio: 16/9;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #2d2b55 0%, #1a1a2e 100%);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -86,7 +108,7 @@ st.markdown("""
 .yt-title {
     font-size: 0.82rem;
     font-weight: 600;
-    color: #1a1a2e;
+    color: #e8e8f0 !important;
     line-height: 1.35;
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -97,49 +119,57 @@ st.markdown("""
 }
 .yt-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
 .yt-tag {
-    background: #eef2ff;
-    color: #4f46e5;
+    background: #2d2b55;
+    color: #a78bfa !important;
     font-size: 0.68rem;
     padding: 2px 7px;
     border-radius: 20px;
     font-weight: 500;
+    border: 1px solid #3d3b75;
 }
-.yt-date { font-size: 0.68rem; color: #9ca3af; }
+.yt-date { font-size: 0.68rem; color: #666688 !important; }
 
-/* 페이지네이션 */
-.pagination { display: flex; justify-content: center; gap: 8px; margin-top: 24px; }
-.page-btn {
-    padding: 6px 14px;
-    border-radius: 8px;
-    border: 1px solid #d1d5db;
-    background: #fff;
-    cursor: pointer;
-    font-size: 0.85rem;
-    color: #374151;
+/* 버튼 */
+.stButton button {
+    background: #2d2b55 !important;
+    color: #a78bfa !important;
+    border: 1px solid #3d3b75 !important;
+    border-radius: 8px !important;
+    font-size: 0.75rem !important;
+    padding: 4px 8px !important;
+    transition: all .15s !important;
 }
-.page-btn.active {
-    background: #4f46e5;
-    color: #fff;
-    border-color: #4f46e5;
-    font-weight: 600;
+.stButton button:hover {
+    background: #3d3b75 !important;
+    border-color: #a78bfa !important;
+    color: #ffffff !important;
 }
 
-/* 모달 오버레이 */
-.modal-backdrop {
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,0.45);
-    z-index: 999;
-    display: flex; align-items: center; justify-content: center;
+/* 탭 */
+.stTabs [data-baseweb="tab-list"] {
+    background: #1e1e2a;
+    border-bottom: 1px solid #2a2a3a;
 }
-.modal-box {
-    background: #fff;
-    border-radius: 16px;
-    padding: 32px;
-    max-width: 720px;
-    width: 90%;
-    max-height: 85vh;
-    overflow-y: auto;
+.stTabs [data-baseweb="tab"] {
+    color: #888 !important;
 }
+.stTabs [aria-selected="true"] {
+    color: #a78bfa !important;
+    border-bottom: 2px solid #a78bfa !important;
+}
+
+/* 텍스트 영역 */
+.stTextArea textarea {
+    background: #1e1e2a !important;
+    color: #e0e0e0 !important;
+    border: 1px solid #2a2a3a !important;
+}
+
+/* 구분선 */
+hr { border-color: #2a2a3a !important; }
+
+/* 캡션 */
+.stCaption { color: #666688 !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -148,26 +178,20 @@ if "page" not in st.session_state:
     st.session_state.page = 1
 if "selected" not in st.session_state:
     st.session_state.selected = None
-if "show_stt" not in st.session_state:
-    st.session_state.show_stt = False
 
-# ── 사이드바 (고정 네비게이션) ───────────────────────
+# ── 사이드바 ─────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 🎬 YT Summary")
     st.markdown("---")
-
-    menu = st.radio("메뉴", ["🏠 홈", "🔖 태그 탐색", "⚙️ 설정"], label_visibility="collapsed")
+    menu = st.radio("메뉴", ["🏠 홈", "🔖 태그 탐색"], label_visibility="collapsed")
     st.markdown("---")
-
     search_q = st.text_input("🔍 제목 검색", placeholder="검색어 입력...")
-
     all_tags = fetch_all_tags()
     selected_tag = ""
     if all_tags:
         tag_options = ["전체"] + all_tags
         tag_choice = st.selectbox("🏷️ 태그 필터", tag_options)
         selected_tag = "" if tag_choice == "전체" else tag_choice
-
     st.markdown("---")
     st.caption("🎬 나만의 유튜브 요약 대시보드")
 
@@ -190,7 +214,7 @@ st.markdown("### 📺 나의 유튜브 요약 대시보드")
 st.caption(f"총 {total or 0}개의 요약 · {st.session_state.page}/{total_pages} 페이지")
 st.markdown("---")
 
-# ── 카드 그리드 (5열 × 3행) ─────────────────────────
+# ── 카드 그리드 ──────────────────────────────────────
 if not data:
     st.info("저장된 요약이 없습니다. 텔레그램 봇에 유튜브 링크를 보내보세요! 🚀")
 else:
@@ -204,7 +228,7 @@ else:
             with cols[col_idx]:
                 thumb = item.get("thumbnail_url", "")
                 title = item.get("title") or "제목 없음"
-                tags = item.get("tags") or []
+                tags  = item.get("tags") or []
                 date_str = (item.get("created_at") or "")[:10]
 
                 thumb_html = (
@@ -227,7 +251,6 @@ else:
 
                 if st.button("자세히 보기", key=f"btn_{item['id']}", use_container_width=True):
                     st.session_state.selected = item
-                    st.session_state.show_stt = False
                     st.rerun()
 
 # ── 페이지네이션 ─────────────────────────────────────
@@ -239,9 +262,8 @@ if total_pages > 1:
             st.session_state.page -= 1
             st.rerun()
     with pg_cols[1]:
-        # 페이지 번호 버튼 (최대 7개 표시)
         start = max(1, st.session_state.page - 3)
-        end = min(total_pages, start + 6)
+        end   = min(total_pages, start + 6)
         btn_cols = st.columns(end - start + 1)
         for i, pg in enumerate(range(start, end + 1)):
             with btn_cols[i]:
@@ -257,35 +279,32 @@ if total_pages > 1:
 # ── 상세 모달 ─────────────────────────────────────────
 if st.session_state.selected:
     item = st.session_state.selected
-    with st.container():
-        st.markdown("---")
-        c1, c2 = st.columns([5, 1])
-        with c1:
-            st.markdown(f"## 📺 {item.get('title', '제목 없음')}")
-        with c2:
-            if st.button("✕ 닫기", key="close_modal"):
-                st.session_state.selected = None
-                st.rerun()
+    st.markdown("---")
+    c1, c2 = st.columns([5, 1])
+    with c1:
+        st.markdown(f"## 📺 {item.get('title', '제목 없음')}")
+    with c2:
+        if st.button("✕ 닫기", key="close_modal"):
+            st.session_state.selected = None
+            st.rerun()
 
-        col_thumb, col_info = st.columns([1, 2])
-        with col_thumb:
-            if item.get("thumbnail_url"):
-                st.image(item["thumbnail_url"], use_container_width=True)
-        with col_info:
-            tags = item.get("tags") or []
-            if tags:
-                st.markdown(" ".join(f"`#{t}`" for t in tags))
-            st.markdown(f"📅 {(item.get('created_at') or '')[:10]}")
-            if item.get("youtube_url"):
-                st.markdown(f"[▶ YouTube에서 보기]({item['youtube_url']})")
+    col_thumb, col_info = st.columns([1, 2])
+    with col_thumb:
+        if item.get("thumbnail_url"):
+            st.image(item["thumbnail_url"], use_container_width=True)
+    with col_info:
+        tags = item.get("tags") or []
+        if tags:
+            st.markdown(" ".join(f"`#{t}`" for t in tags))
+        st.markdown(f"📅 {(item.get('created_at') or '')[:10]}")
+        if item.get("youtube_url"):
+            st.markdown(f"[▶ YouTube에서 보기]({item['youtube_url']})")
 
-        st.markdown("---")
-
-        # 요약 탭 / STT 탭
-        tab1, tab2 = st.tabs(["📝 AI 요약", "📄 전체 STT"])
-        with tab1:
-            summary = item.get("summary_text") or "_요약 내용이 없습니다._"
-            st.markdown(summary)
-        with tab2:
-            stt = item.get("video_stt_url") or "_STT 내용이 없습니다._"
-            st.text_area("전체 스크립트", stt, height=400)
+    st.markdown("---")
+    tab1, tab2 = st.tabs(["📝 AI 요약", "📄 전체 STT"])
+    with tab1:
+        summary = item.get("summary_text") or "_요약 내용이 없습니다._"
+        st.markdown(summary)
+    with tab2:
+        stt = item.get("video_stt_url") or "_STT 내용이 없습니다._"
+        st.text_area("전체 스크립트", stt, height=400)
