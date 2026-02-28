@@ -6,7 +6,6 @@ from aiohttp import web
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
 from youtube_transcript_api import YouTubeTranscriptApi
-from youtube_transcript_api.proxies import WebshareProxyConfig
 from openai import AsyncOpenAI
 from supabase import create_client
 
@@ -82,8 +81,8 @@ def extract_video_id(url: str) -> str | None:
 
 def get_transcript(video_id: str) -> str:
     try:
-        proxy_config = WebshareProxyConfig(proxy_username=WEBSHARE_API_KEY, proxy_password="")
-        ytt = YouTubeTranscriptApi(proxy_config=proxy_config)
+        proxy_url = "http://ipywejpk:kt5p4tcxl33h@31.59.20.176:6754"
+        ytt = YouTubeTranscriptApi(proxies={"http": proxy_url, "https": proxy_url})
         for lang in [["ko"], ["en"], None]:
             try:
                 entries = ytt.get_transcript(video_id, languages=lang) if lang else ytt.get_transcript(video_id)
