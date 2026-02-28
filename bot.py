@@ -4,7 +4,7 @@ pip install python-telegram-bot youtube-transcript-api anthropic supabase yt-dlp
 import re, asyncio, anthropic
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
-from youtube_transcript_api import YouTubeTranscriptApi
+import yt_dlp
 from supabase import create_client
 
 # ── 설정 (Railway 환경변수에서 로드) ────────────────
@@ -81,21 +81,39 @@ def extract_video_id(url: str) -> str | None:
     return None
 
 def get_transcript(video_id: str) -> str:
+    url = f"https://www.youtube.com/watch?v={video_id}"
+    ydl_opts = {
+        "skip_download": True,
+        "writesubtitles": True,
+        "writeautomaticsub": True,
+        "subtitleslangs": ["ko", "en"],
+        "quiet": True,
+    }
     try:
-        # 한국어 우선, 없으면 영어, 없으면 자동생성
-        for lang in [["ko"], ["en"], None]:
-            try:
-                entries = (
-                    YouTubeTranscriptApi.get_transcript(video_id, languages=lang)
-                    if lang else
-                    YouTubeTranscriptApi.get_transcript(video_id)
-                )
-                return " ".join(e["text"] for e in entries)
-            except Exception:
-                continue
-    except Exception:
-        pass
-    return ""
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            # 자막 텍스트 추출
+            subtitles = info.get("subtitles") or info.get("automatic_captions") or {}
+            for lang in ["ko", "en"]:
+                if lang in subtitles:
+                    entries = subtitles[lang]
+                    # json3 포맷 우선
+                    for fmt in entries:
+                        if fmt.get("ext") == "json3":
+                            import urllib.request, json
+                            with urllib.request.urlopen(fmt["url"]) as r:
+                                data = json.loads(r.read())
+                            texts = [
+                                seg.get("utf8", "")
+                                for event in data.get("events", [])
+                                for seg in event.get("segs", [])
+                            ]
+                            return " ".join(t for t in texts if t.strip())
+            # 자막 없으면 description으로 대체
+            return info.get("description", "")
+    except Exception as e:
+        print(f"트랜스크립트 오류: {e}")
+        return ""
 
 def get_thumbnail(video_id: str) -> str:
     return f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
