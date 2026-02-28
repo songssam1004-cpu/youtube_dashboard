@@ -2,9 +2,9 @@ import streamlit as st
 from supabase import create_client
 import math
 
-# ── 설정 ────────────────────────────────────────────
-SUPABASE_URL = "https://steezutktgefzzirvqme.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN0ZWV6dXRrdGdlZnp6aXJ2cW1lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyMjI4NjAsImV4cCI6MjA4Nzc5ODg2MH0.24Fnv7SMf1z10no4lAFGFF6t7aKosmsSKIrlvpZqrh4"
+# ── 설정 (Streamlit secrets에서 로드) ───────────────
+SUPABASE_URL = st.secrets["supabase"]["url"]
+SUPABASE_KEY = st.secrets["supabase"]["anon_key"]
 COLS = 5
 ROWS = 3
 PAGE_SIZE = COLS * ROWS  # 15
@@ -169,9 +169,7 @@ with st.sidebar:
         selected_tag = "" if tag_choice == "전체" else tag_choice
 
     st.markdown("---")
-    # 회원가입/로그인 버튼 (디자인만)
-    st.button("👤 로그인", use_container_width=True)
-    st.button("✨ 회원가입", use_container_width=True, type="primary")
+    st.caption("🎬 나만의 유튜브 요약 대시보드")
 
 # ── 검색/필터 변경 시 페이지 리셋 ────────────────────
 if "prev_search" not in st.session_state:
