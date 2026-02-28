@@ -83,21 +83,25 @@ def get_transcript(video_id: str) -> str:
     proxy_url = "http://ipywejpk:kt5p4tcxl33h@31.59.20.176:6754"
     print(f"트랜스크립트 시도: {video_id}")
     try:
-        import os as _os
-        _os.environ["HTTP_PROXY"]  = proxy_url
-        _os.environ["HTTPS_PROXY"] = proxy_url
-        ytt = YouTubeTranscriptApi()
-        for lang in [["ko"], ["en"], None]:
-            try:
-                entries = ytt.fetch(video_id, languages=lang) if lang else ytt.fetch(video_id)
-                return " ".join(e["text"] for e in entries)
-            except Exception as e:
-                print(f"트랜스크립트 실패 ({lang}): {e}")
+        import requests
+        from youtube_transcript_api._transcripts import TranscriptListFetcher
+        session = requests.Session()
+        session.proxies = {"http": proxy_url, "https": proxy_url}
+        fetcher = TranscriptListFetcher(session)
+        transcript_list = fetcher.fetch(video_id)
+        # 수동 자막 우선, 없으면 자동생성
+        for find_generated in [False, True]:
+            for lang in ["ko", "en"]:
+                try:
+                    t = transcript_list.find_transcript([lang])
+                    if t.is_generated == find_generated or find_generated:
+                        entries = t.fetch()
+                        print(f"트랜스크립트 성공: {lang}, generated={t.is_generated}")
+                        return " ".join(e["text"] for e in entries)
+                except Exception as e:
+                    print(f"시도 실패 ({lang}): {e}")
     except Exception as e:
         print(f"트랜스크립트 오류: {e}")
-    finally:
-        _os.environ.pop("HTTP_PROXY", None)
-        _os.environ.pop("HTTPS_PROXY", None)
     return ""
 
 def get_thumbnail(video_id: str) -> str:
