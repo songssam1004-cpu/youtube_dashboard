@@ -176,12 +176,10 @@ async def main():
     port = int(os.environ.get("PORT", 8080))
     webhook_path = f"/webhook/{TELEGRAM_TOKEN}"
 
-    await app.bot.set_webhook(url=f"{WEBHOOK_URL}{webhook_path}")
-
     async def handle_webhook(request):
         data = await request.json()
         update = Update.de_json(data, app.bot)
-        await app.process_update(update)
+        asyncio.create_task(app.process_update(update))
         return web.Response(text="OK")
 
     async def handle_health(request):
@@ -194,12 +192,14 @@ async def main():
     runner = web.AppRunner(web_app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
 
-    async with app:
-        await app.start()
-        await site.start()
-        print(f"봇 시작! Webhook: {WEBHOOK_URL}{webhook_path}")
-        await asyncio.Event().wait()
+    await app.initialize()
+    await app.bot.set_webhook(url=f"{WEBHOOK_URL}{webhook_path}")
+    await app.start()
+
+    print(f"봇 시작! Webhook: {WEBHOOK_URL}{webhook_path}")
+    await asyncio.Event().wait()
 
 if __name__ == "__main__":
     asyncio.run(main())
