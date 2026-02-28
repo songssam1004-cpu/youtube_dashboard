@@ -2,6 +2,7 @@
 pip install python-telegram-bot youtube-transcript-api anthropic supabase yt-dlp
 """
 import re, asyncio, anthropic
+import os
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
 from youtube_transcript_api import YouTubeTranscriptApi
