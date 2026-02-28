@@ -1,21 +1,21 @@
 import os
 import re
 import asyncio
+import requests
 from aiohttp import web
 
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
-import requests
 from openai import AsyncOpenAI
 from supabase import create_client
 
 # ── 설정 ────────────────────────────────────────────
-TELEGRAM_TOKEN   = os.environ["TELEGRAM_TOKEN"]
-OPENAI_KEY       = os.environ["OPENAI_KEY"]
-SUPABASE_URL     = os.environ["SUPABASE_URL"]
-SUPABASE_KEY     = os.environ["SUPABASE_KEY"]
-APIFY_TOKEN      = os.environ["APIFY_TOKEN"]
-WEBHOOK_URL      = os.environ["WEBHOOK_URL"]
+TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
+OPENAI_KEY     = os.environ["OPENAI_KEY"]
+SUPABASE_URL   = os.environ["SUPABASE_URL"]
+SUPABASE_KEY   = os.environ["SUPABASE_KEY"]
+APIFY_TOKEN    = os.environ["APIFY_TOKEN"]
+WEBHOOK_URL    = os.environ["WEBHOOK_URL"]
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 ai       = AsyncOpenAI(api_key=OPENAI_KEY)
@@ -82,26 +82,28 @@ def extract_video_id(url: str) -> str | None:
 def get_transcript(video_id: str) -> str:
     print(f"트랜스크립트 시도: {video_id}")
     try:
-        import requests
         url = "https://api.apify.com/v2/acts/karamelo~youtube-transcripts/run-sync-get-dataset-items"
         params = {"token": APIFY_TOKEN}
-        payload = {
-            "urls": [f"https://www.youtube.com/watch?v={video_id}"]
-        }
+        payload = {"urls": [f"https://www.youtube.com/watch?v={video_id}"]}
         resp = requests.post(url, json=payload, params=params, timeout=120)
         items = resp.json()
         if items and isinstance(items, list):
-            # 텍스트 합치기
-            transcript = " ".join(
-                seg.get("text", "")
-                for item in items
-                for seg in (item.get("transcript") or [item] if isinstance(item.get("transcript"), list) else [item])
-                if seg.get("text")
-            )
-            if transcript:
-                print(f"트랜스크립트 성공: {len(transcript)}자")
-                return transcript
-        print(f"트랜스크립트 응답: {items}")
+            item = items[0]
+            # captions 필드 우선
+            captions = item.get("captions") or []
+            if captions:
+                transcript = " ".join(c for c in captions if isinstance(c, str))
+                if transcript:
+                    print(f"트랜스크립트 성공 (captions): {len(transcript)}자")
+                    return transcript
+            # transcript 필드 폴백
+            transcript_data = item.get("transcript") or []
+            if transcript_data:
+                transcript = " ".join(t.get("text", "") for t in transcript_data if isinstance(t, dict))
+                if transcript:
+                    print(f"트랜스크립트 성공 (transcript): {len(transcript)}자")
+                    return transcript
+        print(f"트랜스크립트 응답 없음: {items}")
     except Exception as e:
         print(f"트랜스크립트 오류: {e}")
     return ""
