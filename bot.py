@@ -86,7 +86,7 @@ def get_transcript(video_id: str) -> str:
         url = "https://api.apify.com/v2/acts/karamelo~youtube-transcripts/run-sync-get-dataset-items"
         params = {"token": APIFY_TOKEN}
         payload = {
-            "videoUrls": [f"https://www.youtube.com/watch?v={video_id}"]
+            "urls": [f"https://www.youtube.com/watch?v={video_id}"]
         }
         resp = requests.post(url, json=payload, params=params, timeout=120)
         items = resp.json()
