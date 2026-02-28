@@ -83,7 +83,10 @@ def get_transcript(video_id: str) -> str:
     proxy_url = "http://ipywejpk:kt5p4tcxl33h@31.59.20.176:6754"
     print(f"트랜스크립트 시도: {video_id}")
     try:
-        ytt = YouTubeTranscriptApi(proxies={"http": proxy_url, "https": proxy_url})
+        import os as _os
+        _os.environ["HTTP_PROXY"]  = proxy_url
+        _os.environ["HTTPS_PROXY"] = proxy_url
+        ytt = YouTubeTranscriptApi()
         for lang in [["ko"], ["en"], None]:
             try:
                 entries = ytt.fetch(video_id, languages=lang) if lang else ytt.fetch(video_id)
@@ -92,6 +95,9 @@ def get_transcript(video_id: str) -> str:
                 print(f"트랜스크립트 실패 ({lang}): {e}")
     except Exception as e:
         print(f"트랜스크립트 오류: {e}")
+    finally:
+        _os.environ.pop("HTTP_PROXY", None)
+        _os.environ.pop("HTTPS_PROXY", None)
     return ""
 
 def get_thumbnail(video_id: str) -> str:
