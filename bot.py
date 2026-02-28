@@ -84,22 +84,22 @@ def get_transcript(video_id: str) -> str:
     print(f"트랜스크립트 시도: {video_id}")
     try:
         import requests
-        from youtube_transcript_api._transcripts import TranscriptListFetcher
         session = requests.Session()
         session.proxies = {"http": proxy_url, "https": proxy_url}
-        fetcher = TranscriptListFetcher(session)
-        transcript_list = fetcher.fetch(video_id)
-        # 수동 자막 우선, 없으면 자동생성
-        for find_generated in [False, True]:
-            for lang in ["ko", "en"]:
-                try:
-                    t = transcript_list.find_transcript([lang])
-                    if t.is_generated == find_generated or find_generated:
-                        entries = t.fetch()
-                        print(f"트랜스크립트 성공: {lang}, generated={t.is_generated}")
-                        return " ".join(e["text"] for e in entries)
-                except Exception as e:
-                    print(f"시도 실패 ({lang}): {e}")
+        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id, proxies={"http": proxy_url, "https": proxy_url})
+        for lang in ["ko", "en"]:
+            try:
+                t = transcript_list.find_transcript([lang])
+                entries = t.fetch()
+                print(f"트랜스크립트 성공: {lang}")
+                return " ".join(e["text"] for e in entries)
+            except Exception as e:
+                print(f"시도 실패 ({lang}): {e}")
+        # 어떤 언어든 첫 번째 자막 사용
+        for t in transcript_list:
+            entries = t.fetch()
+            print(f"트랜스크립트 성공 (fallback): {t.language_code}")
+            return " ".join(e["text"] for e in entries)
     except Exception as e:
         print(f"트랜스크립트 오류: {e}")
     return ""
