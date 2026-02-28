@@ -5,7 +5,7 @@ from aiohttp import web
 
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
-from apify_client import ApifyClient
+import requests
 from openai import AsyncOpenAI
 from supabase import create_client
 
@@ -82,26 +82,26 @@ def extract_video_id(url: str) -> str | None:
 def get_transcript(video_id: str) -> str:
     print(f"트랜스크립트 시도: {video_id}")
     try:
-        client = ApifyClient(APIFY_TOKEN)
-        run = client.actor("topaz-group/youtube-transcript-scraper").call(run_input={
-            "videoUrls": [f"https://www.youtube.com/watch?v={video_id}"],
-            "language": "ko",
-        })
-        items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
-        if items:
-            transcript = " ".join(item.get("text", "") for item in items if item.get("text"))
-            print(f"트랜스크립트 성공: {len(transcript)}자")
-            return transcript
-        # 한국어 없으면 영어로 재시도
-        run = client.actor("topaz-group/youtube-transcript-scraper").call(run_input={
-            "videoUrls": [f"https://www.youtube.com/watch?v={video_id}"],
-            "language": "en",
-        })
-        items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
-        if items:
-            transcript = " ".join(item.get("text", "") for item in items if item.get("text"))
-            print(f"트랜스크립트 성공 (en): {len(transcript)}자")
-            return transcript
+        import requests
+        url = "https://api.apify.com/v2/acts/karamelo~youtube-transcripts/run-sync-get-dataset-items"
+        params = {"token": APIFY_TOKEN}
+        payload = {
+            "videoUrls": [f"https://www.youtube.com/watch?v={video_id}"]
+        }
+        resp = requests.post(url, json=payload, params=params, timeout=120)
+        items = resp.json()
+        if items and isinstance(items, list):
+            # 텍스트 합치기
+            transcript = " ".join(
+                seg.get("text", "")
+                for item in items
+                for seg in (item.get("transcript") or [item] if isinstance(item.get("transcript"), list) else [item])
+                if seg.get("text")
+            )
+            if transcript:
+                print(f"트랜스크립트 성공: {len(transcript)}자")
+                return transcript
+        print(f"트랜스크립트 응답: {items}")
     except Exception as e:
         print(f"트랜스크립트 오류: {e}")
     return ""
