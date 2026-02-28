@@ -81,24 +81,26 @@ def extract_video_id(url: str) -> str | None:
 
 def get_transcript(video_id: str) -> str:
     proxy_url = "http://ipywejpk:kt5p4tcxl33h@31.59.20.176:6754"
+    proxies = {"http": proxy_url, "https": proxy_url}
     print(f"트랜스크립트 시도: {video_id}")
     try:
         import requests
         session = requests.Session()
-        session.proxies = {"http": proxy_url, "https": proxy_url}
-        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id, proxies={"http": proxy_url, "https": proxy_url})
+        session.proxies = proxies
+        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id, proxies=proxies)
+        # ko, en 우선 시도 후 첫 번째 자막으로 폴백
+        target = None
         for lang in ["ko", "en"]:
             try:
-                t = transcript_list.find_transcript([lang])
-                entries = t.fetch()
-                print(f"트랜스크립트 성공: {lang}")
-                return " ".join(e["text"] for e in entries)
-            except Exception as e:
-                print(f"시도 실패 ({lang}): {e}")
-        # 어떤 언어든 첫 번째 자막 사용
-        for t in transcript_list:
-            entries = t.fetch()
-            print(f"트랜스크립트 성공 (fallback): {t.language_code}")
+                target = transcript_list.find_transcript([lang])
+                break
+            except Exception:
+                continue
+        if not target:
+            target = next(iter(transcript_list), None)
+        if target:
+            entries = target.fetch(proxies=proxies)
+            print(f"트랜스크립트 성공: {target.language_code}")
             return " ".join(e["text"] for e in entries)
     except Exception as e:
         print(f"트랜스크립트 오류: {e}")
