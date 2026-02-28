@@ -199,8 +199,5 @@ def run_web():
 
 # ── 실행 ─────────────────────────────────────────────
 if __name__ == "__main__":
-    threading.Thread(target=run_web, daemon=True).start()
-    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    print("봇 시작!")
+    asyncio.run(main())
     app.run_polling()
