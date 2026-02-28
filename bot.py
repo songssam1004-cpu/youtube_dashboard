@@ -1,8 +1,7 @@
 import os
 import re
 import asyncio
-from http.server import HTTPServer, BaseHTTPRequestHandler
-import threading
+from aiohttp import web
 
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
@@ -11,12 +10,13 @@ from youtube_transcript_api.proxies import WebshareProxyConfig
 from openai import AsyncOpenAI
 from supabase import create_client
 
-# ── 설정 (Railway 환경변수에서 로드) ────────────────
+# ── 설정 ────────────────────────────────────────────
 TELEGRAM_TOKEN   = os.environ["TELEGRAM_TOKEN"]
 OPENAI_KEY       = os.environ["OPENAI_KEY"]
 SUPABASE_URL     = os.environ["SUPABASE_URL"]
 SUPABASE_KEY     = os.environ["SUPABASE_KEY"]
 WEBSHARE_API_KEY = os.environ["WEBSHARE_API_KEY"]
+WEBHOOK_URL      = os.environ["WEBHOOK_URL"]
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 ai       = AsyncOpenAI(api_key=OPENAI_KEY)
@@ -74,11 +74,7 @@ transcript:
 
 # ── 유틸 함수 ────────────────────────────────────────
 def extract_video_id(url: str) -> str | None:
-    patterns = [
-        r"(?:v=|youtu\.be/|shorts/)([A-Za-z0-9_-]{11})",
-        r"(?:embed/)([A-Za-z0-9_-]{11})",
-    ]
-    for p in patterns:
+    for p in [r"(?:v=|youtu\.be/|shorts/)([A-Za-z0-9_-]{11})", r"(?:embed/)([A-Za-z0-9_-]{11})"]:
         m = re.search(p, url)
         if m:
             return m.group(1)
@@ -90,11 +86,7 @@ def get_transcript(video_id: str) -> str:
         ytt = YouTubeTranscriptApi(proxy_config=proxy_config)
         for lang in [["ko"], ["en"], None]:
             try:
-                entries = (
-                    ytt.get_transcript(video_id, languages=lang)
-                    if lang else
-                    ytt.get_transcript(video_id)
-                )
+                entries = ytt.get_transcript(video_id, languages=lang) if lang else ytt.get_transcript(video_id)
                 return " ".join(e["text"] for e in entries)
             except Exception:
                 continue
@@ -107,15 +99,11 @@ def get_thumbnail(video_id: str) -> str:
 
 def parse_tags(summary: str) -> list[str]:
     m = re.search(r"\[TAGS\]\s*(.+)", summary)
-    if m:
-        return [t.strip() for t in m.group(1).split(",") if t.strip()]
-    return []
+    return [t.strip() for t in m.group(1).split(",")] if m else []
 
 def parse_title(summary: str) -> str:
     m = re.search(r"##\s*🚀\s*(.+?)(?:\s*\(Title\))?$", summary, re.MULTILINE)
-    if m:
-        return m.group(1).strip().strip("[]")
-    return "제목 없음"
+    return m.group(1).strip().strip("[]") if m else "제목 없음"
 
 def save_to_db(youtube_url, video_id, title, summary, transcript, tags):
     supabase.table("youtube_summaries").insert({
@@ -139,10 +127,7 @@ async def one_line_summary(summary: str) -> str:
     resp = await ai.chat.completions.create(
         model="gpt-4o-mini",
         max_tokens=200,
-        messages=[{
-            "role": "user",
-            "content": f"아래 요약 내용을 핵심만 담아 한국어로 딱 1문장으로 요약해줘:\n\n{summary}"
-        }]
+        messages=[{"role": "user", "content": f"아래 요약 내용을 핵심만 담아 한국어로 딱 1문장으로 요약해줘:\n\n{summary}"}]
     )
     return resp.choices[0].message.content.strip()
 
@@ -159,14 +144,12 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
 
     msg = await update.message.reply_text("⏳ 트랜스크립트 가져오는 중...")
-
     transcript = get_transcript(video_id)
     if not transcript:
         await msg.edit_text("❌ 자막/트랜스크립트를 가져올 수 없는 영상이에요.")
         return
 
     await msg.edit_text("🤖 AI 요약 중... (약 30초 소요)")
-
     try:
         summary  = await summarize(transcript)
         one_line = await one_line_summary(summary)
@@ -184,20 +167,38 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await msg.edit_text(f"❌ 오류 발생: {e}")
 
-# ── 더미 웹서버 (Railway 종료 방지) ─────────────────
-class HealthHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"OK")
-    def log_message(self, *args):
-        pass
+# ── Webhook 서버 ─────────────────────────────────────
+async def main():
+    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-def run_web():
     port = int(os.environ.get("PORT", 8080))
-    HTTPServer(("0.0.0.0", port), HealthHandler).serve_forever()
+    webhook_path = f"/webhook/{TELEGRAM_TOKEN}"
 
-# ── 실행 ─────────────────────────────────────────────
+    await app.bot.set_webhook(url=f"{WEBHOOK_URL}{webhook_path}")
+
+    async def handle_webhook(request):
+        data = await request.json()
+        update = Update.de_json(data, app.bot)
+        await app.process_update(update)
+        return web.Response(text="OK")
+
+    async def handle_health(request):
+        return web.Response(text="OK")
+
+    web_app = web.Application()
+    web_app.router.add_post(webhook_path, handle_webhook)
+    web_app.router.add_get("/", handle_health)
+
+    runner = web.AppRunner(web_app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", port)
+
+    async with app:
+        await app.start()
+        await site.start()
+        print(f"봇 시작! Webhook: {WEBHOOK_URL}{webhook_path}")
+        await asyncio.Event().wait()
+
 if __name__ == "__main__":
     asyncio.run(main())
-    app.run_polling()
