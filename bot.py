@@ -80,20 +80,19 @@ def extract_video_id(url: str) -> str | None:
     return None
 
 def get_transcript(video_id: str) -> str:
-    try:
-        proxy_url = "http://ipywejpk:kt5p4tcxl33h@31.59.20.176:6754"
-        for lang in [["ko"], ["en"], None]:
-            try:
-                entries = (
-                    YouTubeTranscriptApi.get_transcript(video_id, languages=lang, proxies={"http": proxy_url, "https": proxy_url})
-                    if lang else
-                    YouTubeTranscriptApi.get_transcript(video_id, proxies={"http": proxy_url, "https": proxy_url})
-                )
-                return " ".join(e["text"] for e in entries)
-            except Exception:
-                continue
-    except Exception as e:
-        print(f"트랜스크립트 오류: {e}")
+    proxy_url = "http://ipywejpk:kt5p4tcxl33h@31.59.20.176:6754"
+    print(f"트랜스크립트 시도: {video_id}")
+    for lang in [["ko"], ["en"], None]:
+        try:
+            entries = (
+                YouTubeTranscriptApi.get_transcript(video_id, languages=lang, proxies={"http": proxy_url, "https": proxy_url})
+                if lang else
+                YouTubeTranscriptApi.get_transcript(video_id, proxies={"http": proxy_url, "https": proxy_url})
+            )
+            print(f"트랜스크립트 성공: {lang}")
+            return " ".join(e["text"] for e in entries)
+        except Exception as e:
+            print(f"트랜스크립트 실패 ({lang}): {e}")
     return ""
 
 def get_thumbnail(video_id: str) -> str:
