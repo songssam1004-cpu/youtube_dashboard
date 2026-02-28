@@ -5,7 +5,7 @@ from aiohttp import web
 
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
-from youtube_transcript_api import YouTubeTranscriptApi
+from apify_client import ApifyClient
 from openai import AsyncOpenAI
 from supabase import create_client
 
@@ -14,7 +14,7 @@ TELEGRAM_TOKEN   = os.environ["TELEGRAM_TOKEN"]
 OPENAI_KEY       = os.environ["OPENAI_KEY"]
 SUPABASE_URL     = os.environ["SUPABASE_URL"]
 SUPABASE_KEY     = os.environ["SUPABASE_KEY"]
-WEBSHARE_API_KEY = os.environ["WEBSHARE_API_KEY"]
+APIFY_TOKEN      = os.environ["APIFY_TOKEN"]
 WEBHOOK_URL      = os.environ["WEBHOOK_URL"]
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -80,35 +80,28 @@ def extract_video_id(url: str) -> str | None:
     return None
 
 def get_transcript(video_id: str) -> str:
-    proxy_url = "http://ipywejpk:kt5p4tcxl33h@31.59.20.176:6754"
-    proxies = {"http": proxy_url, "https": proxy_url}
     print(f"트랜스크립트 시도: {video_id}")
     try:
-        import requests
-        # requests 세션을 몽키패치로 프록시 적용
-        original_get = requests.get
-        def proxied_get(*args, **kwargs):
-            kwargs.setdefault("proxies", proxies)
-            return original_get(*args, **kwargs)
-        requests.get = proxied_get
-
-        try:
-            transcript_list = YouTubeTranscriptApi.list_transcripts(video_id, proxies=proxies)
-            target = None
-            for lang in ["ko", "en"]:
-                try:
-                    target = transcript_list.find_transcript([lang])
-                    break
-                except Exception:
-                    continue
-            if not target:
-                target = next(iter(transcript_list), None)
-            if target:
-                entries = target.fetch()
-                print(f"트랜스크립트 성공: {target.language_code}")
-                return " ".join(e["text"] for e in entries)
-        finally:
-            requests.get = original_get
+        client = ApifyClient(APIFY_TOKEN)
+        run = client.actor("streamers/youtube-transcript").call(run_input={
+            "videoUrls": [f"https://www.youtube.com/watch?v={video_id}"],
+            "language": "ko",
+        })
+        items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+        if items:
+            transcript = " ".join(item.get("text", "") for item in items if item.get("text"))
+            print(f"트랜스크립트 성공: {len(transcript)}자")
+            return transcript
+        # 한국어 없으면 영어로 재시도
+        run = client.actor("streamers/youtube-transcript").call(run_input={
+            "videoUrls": [f"https://www.youtube.com/watch?v={video_id}"],
+            "language": "en",
+        })
+        items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+        if items:
+            transcript = " ".join(item.get("text", "") for item in items if item.get("text"))
+            print(f"트랜스크립트 성공 (en): {len(transcript)}자")
+            return transcript
     except Exception as e:
         print(f"트랜스크립트 오류: {e}")
     return ""
