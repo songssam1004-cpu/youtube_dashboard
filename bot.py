@@ -133,7 +133,18 @@ def parse_title(summary: str) -> str:
         return m.group(1).strip().strip("[]")
     return "제목 없음"
 
-async def summarize(transcript: str) -> str:
+async def one_line_summary(summary: str) -> str:
+    resp = await ai.chat.completions.create(
+        model="gpt-4o-mini",
+        max_tokens=200,
+        messages=[{
+            "role": "user",
+            "content": f"아래 요약 내용을 핵심만 담아 한국어로 딱 1문장으로 요약해줘:\n\n{summary}"
+        }]
+    )
+    return resp.choices[0].message.content.strip()
+
+
     resp = await ai.chat.completions.create(
         model="gpt-4o-mini",  # 저렴하고 빠름, gpt-4o로 변경 가능
         max_tokens=4096,
@@ -174,10 +185,18 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     try:
         summary = await summarize(transcript)
+        one_line = await one_line_summary(summary)
         title   = parse_title(summary)
         tags    = parse_tags(summary)
         save_to_db(text, video_id, title, summary, transcript, tags)
-        await msg.edit_text(f"✅ 요약 완료!\n\n📌 *{title}*\n🏷️ {' '.join(f'#{t}' for t in tags)}\n\n대시보드에서 확인하세요!", parse_mode="Markdown")
+        await msg.edit_text(
+            f"✅ 요약 완료!\n\n"
+            f"📌 *{title}*\n"
+            f"🏷️ {' '.join(f'#{t}' for t in tags)}\n\n"
+            f"💡 _{one_line}_\n\n"
+            f"대시보드에서 확인하세요!",
+            parse_mode="Markdown"
+        )
     except Exception as e:
         await msg.edit_text(f"❌ 오류 발생: {e}")
 
