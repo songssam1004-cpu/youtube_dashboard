@@ -182,7 +182,7 @@ if st.session_state.selected_id:
     sid = st.session_state.selected_id
     # UUID 형식이면 id로 조회, 아니면 video_id로 youtube_url 조회
     import re as _re
-    is_uuid = bool(_re.match(r'^[0-9a-f-]{36}
+    is_uuid = bool(_re.match(r'^[0-9a-f\-]{36}$', sid))
     if res.data:
         item = res.data[0]
 
