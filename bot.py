@@ -170,12 +170,13 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         title    = parse_title(summary)
         tags     = parse_tags(summary)
         save_to_db(text, video_id, title, summary, transcript, tags)
+        dashboard_url = f"https://youtubedashboardsong.streamlit.app/?id={video_id}"
         await msg.edit_text(
             f"✅ 요약 완료!\n\n"
             f"📌 *{title}*\n"
             f"🏷️ {' '.join(f'#{t}' for t in tags)}\n\n"
             f"💡 _{one_line}_\n\n"
-            f"대시보드에서 확인하세요!",
+            f"[📊 대시보드에서 확인하기]({dashboard_url})",
             parse_mode="Markdown"
         )
     except Exception as e:
