@@ -82,34 +82,47 @@ def extract_video_id(url: str) -> str | None:
 
 def get_transcript(video_id: str) -> str:
     url = f"https://www.youtube.com/watch?v={video_id}"
+
+    # 쿠키 파일 임시 생성
+    cookie_str = os.environ.get("YOUTUBE_COOKIES", "")
+    cookie_path = "/tmp/yt_cookies.txt"
+    if cookie_str:
+        with open(cookie_path, "w") as f:
+            f.write(cookie_str)
+
     ydl_opts = {
         "skip_download": True,
         "writesubtitles": True,
         "writeautomaticsub": True,
         "subtitleslangs": ["ko", "en"],
         "quiet": True,
+        "no_warnings": False,
     }
+    if cookie_str:
+        ydl_opts["cookiefile"] = cookie_path
+
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
-            # 자막 텍스트 추출
-            subtitles = info.get("subtitles") or info.get("automatic_captions") or {}
-            for lang in ["ko", "en"]:
-                if lang in subtitles:
-                    entries = subtitles[lang]
-                    # json3 포맷 우선
-                    for fmt in entries:
-                        if fmt.get("ext") == "json3":
-                            import urllib.request, json
-                            with urllib.request.urlopen(fmt["url"]) as r:
-                                data = json.loads(r.read())
-                            texts = [
-                                seg.get("utf8", "")
-                                for event in data.get("events", [])
-                                for seg in event.get("segs", [])
-                            ]
-                            return " ".join(t for t in texts if t.strip())
-            # 자막 없으면 description으로 대체
+            subtitles = info.get("subtitles") or {}
+            auto_caps = info.get("automatic_captions") or {}
+
+            for src in [subtitles, auto_caps]:
+                for lang in ["ko", "en"]:
+                    if lang in src:
+                        for fmt in src[lang]:
+                            if fmt.get("ext") == "json3":
+                                import urllib.request, json
+                                with urllib.request.urlopen(fmt["url"]) as r:
+                                    data = json.loads(r.read())
+                                texts = [
+                                    seg.get("utf8", "")
+                                    for event in data.get("events", [])
+                                    for seg in event.get("segs", [])
+                                ]
+                                result = " ".join(t for t in texts if t.strip())
+                                if result:
+                                    return result
             return info.get("description", "")
     except Exception as e:
         print(f"트랜스크립트 오류: {e}")
