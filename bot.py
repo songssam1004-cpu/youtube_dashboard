@@ -1,7 +1,8 @@
 """
 pip install python-telegram-bot youtube-transcript-api anthropic supabase yt-dlp
 """
-import re, asyncio, anthropic
+import re, asyncio
+from openai import AsyncOpenAI
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
 import yt_dlp
@@ -12,12 +13,12 @@ from supabase import create_client
 # ── 설정 (Railway 환경변수에서 로드) ────────────────
 import os
 TELEGRAM_TOKEN  = os.environ["TELEGRAM_TOKEN"]
-ANTHROPIC_KEY   = os.environ["ANTHROPIC_KEY"]
+OPENAI_API_KEY  = os.environ["OPENAI_API_KEY"]
 SUPABASE_URL    = os.environ["SUPABASE_URL"]
 SUPABASE_KEY    = os.environ["SUPABASE_KEY"]
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-ai       = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
+ai = AsyncOpenAI(api_key=OPENAI_API_KEY)
 
 PROMPT_TEMPLATE = """당신은 유튜브 영상을 요약하는 전문가입니다.
 youtube transcript가 인입됩니다. 약간의 노이즈가 있기 때문에 그것을 감안하여 아래 요약 템플릿 형태로 요약을 수행해주세요.
@@ -115,13 +116,13 @@ def parse_title(summary: str) -> str:
         return m.group(1).strip().strip("[]")
     return "제목 없음"
 
-def summarize(transcript: str) -> str:
-    msg = ai.messages.create(
-        model="claude-opus-4-6",
+async def summarize(transcript: str) -> str:
+    res = await ai.chat.completions.create(
+        model="gpt-4o",
         max_tokens=4096,
         messages=[{"role": "user", "content": PROMPT_TEMPLATE.format(transcript=transcript[:12000])}]
     )
-    return msg.content[0].text
+    return res.choices[0].message.content
 
 def save_to_db(youtube_url: str, video_id: str, title: str, summary: str, transcript: str, tags: list):
     supabase.table("youtube_summaries").insert({
@@ -155,7 +156,7 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await msg.edit_text("🤖 AI 요약 중... (약 30초 소요)")
 
     try:
-        summary = summarize(transcript)
+        summary = await summarize(transcript)
         title   = parse_title(summary)
         tags    = parse_tags(summary)
         save_to_db(text, video_id, title, summary, transcript, tags)
