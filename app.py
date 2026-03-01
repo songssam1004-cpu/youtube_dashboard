@@ -140,6 +140,11 @@ for k, v in [("page", 1), ("selected_id", None), ("prev_search", ""), ("prev_tag
     if k not in st.session_state:
         st.session_state[k] = v
 
+# ── URL 파라미터로 상세 페이지 직접 진입 ─────────────
+params = st.query_params
+if "id" in params and not st.session_state.selected_id:
+    st.session_state.selected_id = params["id"]
+
 # ── 사이드바 ─────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 🎬 YT Summary")
@@ -174,7 +179,12 @@ if search_q != st.session_state.prev_search or selected_tag != st.session_state.
 # ══════════════════════════════════════════════════════
 if st.session_state.selected_id:
     client = get_client()
+    # UUID로 먼저 조회, 없으면 video_id로 조회
     res = client.table("youtube_summaries").select("*").eq("id", st.session_state.selected_id).execute()
+    if not res.data:
+        res = client.table("youtube_summaries").select("*").eq("youtube_url", f"https://www.youtube.com/watch?v={st.session_state.selected_id}").execute()
+    if not res.data:
+        res = client.table("youtube_summaries").select("*").ilike("youtube_url", f"%{st.session_state.selected_id}%").execute()
     if res.data:
         item = res.data[0]
 
