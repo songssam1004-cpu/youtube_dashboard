@@ -5,6 +5,8 @@ import re, asyncio, anthropic
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
 import yt_dlp
+from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api.proxies import WebshareProxyConfig
 from supabase import create_client
 
 # ── 설정 (Railway 환경변수에서 로드) ────────────────
@@ -81,49 +83,17 @@ def extract_video_id(url: str) -> str | None:
     return None
 
 def get_transcript(video_id: str) -> str:
-    url = f"https://www.youtube.com/watch?v={video_id}"
-
-    # 쿠키 파일 임시 생성
-    cookie_str = os.environ.get("YOUTUBE_COOKIES", "")
-    cookie_path = "/tmp/yt_cookies.txt"
-    if cookie_str:
-        with open(cookie_path, "w") as f:
-            f.write(cookie_str)
-
-    ydl_opts = {
-        "skip_download": True,
-        "writesubtitles": True,
-        "writeautomaticsub": True,
-        "subtitleslangs": ["ko", "en"],
-        "quiet": True,
-        "no_warnings": False,
-    }
-    if cookie_str:
-        ydl_opts["cookiefile"] = cookie_path
-
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            subtitles = info.get("subtitles") or {}
-            auto_caps = info.get("automatic_captions") or {}
-
-            for src in [subtitles, auto_caps]:
-                for lang in ["ko", "en"]:
-                    if lang in src:
-                        for fmt in src[lang]:
-                            if fmt.get("ext") == "json3":
-                                import urllib.request, json
-                                with urllib.request.urlopen(fmt["url"]) as r:
-                                    data = json.loads(r.read())
-                                texts = [
-                                    seg.get("utf8", "")
-                                    for event in data.get("events", [])
-                                    for seg in event.get("segs", [])
-                                ]
-                                result = " ".join(t for t in texts if t.strip())
-                                if result:
-                                    return result
-            return info.get("description", "")
+        ytt = YouTubeTranscriptApi()
+        for lang in [["ko"], ["en"]]:
+            try:
+                entries = ytt.fetch(video_id, languages=lang)
+                return " ".join(e.text for e in entries)
+            except Exception:
+                continue
+        # 자동생성 자막 시도
+        entries = ytt.fetch(video_id)
+        return " ".join(e.text for e in entries)
     except Exception as e:
         print(f"트랜스크립트 오류: {e}")
         return ""
