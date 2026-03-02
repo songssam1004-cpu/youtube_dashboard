@@ -44,7 +44,7 @@ def delete_summary(item_id: str):
     client.table("youtube_summaries").delete().eq("id", item_id).execute()
 
 # ── 페이지 설정 ──────────────────────────────────────
-st.set_page_config(page_title="내 유튜브 요약 대시보드", layout="wide", page_icon="🎬")
+st.set_page_config(page_title="내 유튜브 요약 대시보드", layout="wide", page_icon="🎬", initial_sidebar_state="auto")
 
 # ── 전역 CSS ─────────────────────────────────────────
 st.markdown("""
@@ -53,6 +53,16 @@ st.markdown("""
 [data-testid="stSidebar"] {
     background: #ffffff;
     border-right: 1px solid #e8ecf0;
+}
+
+/* 다크모드 자동 대응 */
+@media (prefers-color-scheme: dark) {
+    [data-testid="stAppViewContainer"] { background: #1a1a2e !important; }
+    [data-testid="stSidebar"] { background: #16213e !important; border-right: 1px solid #2a2a4a !important; }
+    .yt-card { background: #16213e !important; border-color: #2a2a4a !important; box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important; }
+    .yt-title { color: #e2e8f0 !important; }
+    .yt-tag { background: #2d2d5e !important; color: #818cf8 !important; }
+    .yt-date { color: #64748b !important; }
 }
 .yt-card {
     background: #fff;
@@ -137,7 +147,9 @@ if st.session_state.selected:
         st.markdown(f"📅 {(item.get('created_at') or '')[:10]}")
         if item.get("youtube_url"):
             yt_url = item["youtube_url"]
-            brave_url = f"brave://www.youtube.com/watch?v={item.get('youtube_url', '').split('v=')[-1]}"
+            video_id = yt_url.split("v=")[-1].split("&")[0] if "v=" in yt_url else ""
+            yt_encoded = f"https://www.youtube.com/watch?v={video_id}"
+            brave_url = f"brave://open-url?url={yt_encoded}"
             col_yt, col_brave = st.columns(2)
             with col_yt:
                 st.markdown(f"[▶ YouTube에서 보기]({yt_url})")
