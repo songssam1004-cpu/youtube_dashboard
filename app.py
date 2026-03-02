@@ -147,9 +147,9 @@ if st.session_state.selected:
         st.markdown(f"📅 {(item.get('created_at') or '')[:10]}")
         if item.get("youtube_url"):
             yt_url = item["youtube_url"]
-            video_id = yt_url.split("v=")[-1].split("&")[0] if "v=" in yt_url else ""
-            yt_raw = f"https://www.youtube.com/watch?v={video_id}"
-            brave_url = f"brave://open-url?url=https://www.youtube.com/watch?v={video_id}"
+            video_id = yt_url.split("v=")[-1].split("&")[0] if "v=" in yt_url else yt_url.split("/")[-1].split("?")[0]
+            yt_short = f"https://youtu.be/{video_id}"
+            brave_url = f"brave://open-url?url={yt_short}"
             st.markdown(f"""
             <div style="display:flex; gap:12px; margin-top:8px; flex-wrap:wrap;">
                 <a href="{yt_url}" target="_blank" style="
@@ -165,7 +165,7 @@ if st.session_state.selected:
             </div>
             """, unsafe_allow_html=True)
             st.caption("🔗 URL 직접 복사:")
-            st.code(yt_raw, language=None)
+            st.code(yt_short, language=None)
 
     st.markdown("---")
     tab1, tab2, tab3 = st.tabs(["📝 AI 요약", "📄 전체 STT", "💬 챗봇"])
