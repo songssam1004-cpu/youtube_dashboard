@@ -85,14 +85,18 @@ def extract_video_id(url: str) -> str | None:
 
 def get_transcript(video_id: str) -> str:
     try:
-        ytt = YouTubeTranscriptApi()
+        proxy_config = WebshareProxyConfig(
+            proxy_username=None,
+            proxy_password=None,
+            api_key=os.environ.get("WEBSHARE_API_KEY", "")
+        )
+        ytt = YouTubeTranscriptApi(proxy_config=proxy_config)
         for lang in [["ko"], ["en"]]:
             try:
                 entries = ytt.fetch(video_id, languages=lang)
                 return " ".join(e.text for e in entries)
             except Exception:
                 continue
-        # 자동생성 자막 시도
         entries = ytt.fetch(video_id)
         return " ".join(e.text for e in entries)
     except Exception as e:
