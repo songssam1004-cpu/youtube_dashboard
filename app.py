@@ -148,7 +148,7 @@ if st.session_state.selected:
         if item.get("youtube_url"):
             yt_url = item["youtube_url"]
             video_id = yt_url.split("v=")[-1].split("&")[0] if "v=" in yt_url else ""
-            yt_encoded = f"https://www.youtube.com/watch?v={video_id}"
+            yt_encoded = f"https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3D{video_id}"
             brave_url = f"brave://open-url?url={yt_encoded}"
             col_yt, col_brave = st.columns(2)
             with col_yt:
