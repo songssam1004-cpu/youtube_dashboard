@@ -150,11 +150,20 @@ if st.session_state.selected:
             video_id = yt_url.split("v=")[-1].split("&")[0] if "v=" in yt_url else ""
             yt_raw = f"https://www.youtube.com/watch?v={video_id}"
             brave_url = f"brave://open-url?url={yt_raw}"
-            col_yt, col_brave = st.columns(2)
-            with col_yt:
-                st.markdown(f"[▶ YouTube에서 보기]({yt_url})")
-            with col_brave:
-                st.markdown(f"[🦁 Brave에서 보기]({brave_url})")
+            st.markdown(f"""
+            <div style="display:flex; gap:12px; margin-top:8px;">
+                <a href="{yt_url}" target="_blank" style="
+                    background:#ff0000; color:white; padding:8px 16px;
+                    border-radius:8px; text-decoration:none; font-weight:600;">
+                    ▶ YouTube에서 보기
+                </a>
+                <a href="{brave_url}" style="
+                    background:#ff5500; color:white; padding:8px 16px;
+                    border-radius:8px; text-decoration:none; font-weight:600;">
+                    🦁 Brave에서 보기
+                </a>
+            </div>
+            """, unsafe_allow_html=True)
 
     st.markdown("---")
     tab1, tab2, tab3 = st.tabs(["📝 AI 요약", "📄 전체 STT", "💬 챗봇"])
