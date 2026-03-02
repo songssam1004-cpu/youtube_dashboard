@@ -1,11 +1,10 @@
 """
 pip install python-telegram-bot youtube-transcript-api anthropic supabase yt-dlp
 """
-import re, asyncio
+import re, asyncio, requests
 from openai import AsyncOpenAI
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
-import yt_dlp
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api.proxies import WebshareProxyConfig
 from supabase import create_client
@@ -85,23 +84,25 @@ def extract_video_id(url: str) -> str | None:
 
 def get_transcript(video_id: str) -> str:
     try:
-        proxy_user = os.environ.get("WEBSHARE_PROXY_USER", "")
-        proxy_pass = os.environ.get("WEBSHARE_PROXY_PASS", "")
-        proxy_config = WebshareProxyConfig(proxy_user, proxy_pass) if proxy_user and proxy_pass else None
-        ytt = YouTubeTranscriptApi(proxy_config=proxy_config) if proxy_config else YouTubeTranscriptApi()
-
-        # 사용 가능한 자막 목록 먼저 확인
-        transcript_list = ytt.list(video_id)
-        for lang in ["ko", "en"]:
-            try:
-                entries = transcript_list.find_transcript([lang]).fetch()
-                return " ".join(e.text for e in entries)
-            except Exception:
-                continue
-        # 어떤 언어든 첫 번째 자막 사용
-        for t in transcript_list:
-            entries = t.fetch()
-            return " ".join(e.text for e in entries)
+        apify_token = os.environ.get("APIFY_TOKEN", "")
+        # Apify YouTube Transcript Scraper Actor 호출
+        run_url = f"https://api.apify.com/v2/acts/streamers~youtube-scraper/run-sync-get-dataset-items?token={apify_token}"
+        payload = {
+            "startUrls": [{"url": f"https://www.youtube.com/watch?v={video_id}"}],
+            "maxResults": 1,
+            "subtitlesLanguage": "any",
+        }
+        res = requests.post(run_url, json=payload, timeout=120)
+        data = res.json()
+        if data and len(data) > 0:
+            item = data[0]
+            # 자막 텍스트 추출
+            subtitles = item.get("subtitles") or []
+            if subtitles:
+                return " ".join(s.get("text", "") for s in subtitles)
+            # 자막 없으면 description
+            return item.get("description", "")
+        return ""
     except Exception as e:
         print(f"트랜스크립트 오류: {e}")
         return ""
