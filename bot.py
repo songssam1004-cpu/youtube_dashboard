@@ -83,11 +83,11 @@ def extract_video_id(url: str) -> str | None:
 
 def get_transcript(video_id: str) -> str:
     try:
-        run_url = f"https://api.apify.com/v2/acts/karamelo~youtube-transcripts/run-sync-get-dataset-items?token={APIFY_TOKEN}"
+        run_url = f"https://api.apify.com/v2/acts/karamelo~youtube-transcripts/run-sync-get-dataset-items?token={APIFY_TOKEN}&memory=1024&timeout=120"
         payload = {
             "urls": [f"https://www.youtube.com/watch?v={video_id}"],
         }
-        res = requests.post(run_url, json=payload, timeout=120)
+        res = requests.post(run_url, json=payload, timeout=180)
         data = res.json()
         print(f"Apify 응답: {data}")
         if data and len(data) > 0:
