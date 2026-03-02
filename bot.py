@@ -92,11 +92,16 @@ def get_transcript(video_id: str) -> str:
         print(f"Apify 응답: {data}")
         if data and len(data) > 0:
             item = data[0]
-            # 트랜스크립트 텍스트 추출
-            transcript = item.get("transcript") or item.get("text") or item.get("captions") or ""
-            if isinstance(transcript, list):
-                return " ".join(t.get("text", "") for t in transcript)
-            return str(transcript)
+            transcript = item.get("transcript") or item.get("text") or ""
+            if transcript:
+                if isinstance(transcript, list):
+                    return " ".join(t.get("text", "") for t in transcript if t)
+                return str(transcript)
+            # captions 처리
+            captions = item.get("captions") or []
+            texts = [c.get("text", "") for c in captions if c and isinstance(c, dict)]
+            if texts:
+                return " ".join(texts)
         return ""
     except Exception as e:
         print(f"트랜스크립트 오류: {e}")
