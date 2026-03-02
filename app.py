@@ -149,8 +149,7 @@ if st.session_state.selected:
             yt_url = item["youtube_url"]
             video_id = yt_url.split("v=")[-1].split("&")[0] if "v=" in yt_url else ""
             yt_raw = f"https://www.youtube.com/watch?v={video_id}"
-            from urllib.parse import quote
-            brave_url = f"brave://open-url?url={quote(yt_raw, safe='')}"
+            brave_url = f"brave://open-url?url={yt_raw}"
             col_yt, col_brave = st.columns(2)
             with col_yt:
                 st.markdown(f"[▶ YouTube에서 보기]({yt_url})")
