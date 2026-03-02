@@ -83,20 +83,20 @@ def extract_video_id(url: str) -> str | None:
 
 def get_transcript(video_id: str) -> str:
     try:
-        run_url = f"https://api.apify.com/v2/acts/streamers~youtube-scraper/run-sync-get-dataset-items?token={APIFY_TOKEN}"
+        run_url = f"https://api.apify.com/v2/acts/karamelo~youtube-transcripts/run-sync-get-dataset-items?token={APIFY_TOKEN}"
         payload = {
-            "startUrls": [{"url": f"https://www.youtube.com/watch?v={video_id}"}],
-            "maxResults": 1,
-            "subtitlesLanguage": "any",
+            "videoUrls": [f"https://www.youtube.com/watch?v={video_id}"],
         }
         res = requests.post(run_url, json=payload, timeout=120)
         data = res.json()
+        print(f"Apify 응답: {data}")
         if data and len(data) > 0:
             item = data[0]
-            subtitles = item.get("subtitles") or []
-            if subtitles:
-                return " ".join(s.get("text", "") for s in subtitles)
-            return item.get("description", "")
+            # 트랜스크립트 텍스트 추출
+            transcript = item.get("transcript") or item.get("text") or item.get("captions") or ""
+            if isinstance(transcript, list):
+                return " ".join(t.get("text", "") for t in transcript)
+            return str(transcript)
         return ""
     except Exception as e:
         print(f"트랜스크립트 오류: {e}")
