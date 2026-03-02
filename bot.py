@@ -1,23 +1,22 @@
 """
-pip install python-telegram-bot youtube-transcript-api anthropic supabase yt-dlp
+pip install python-telegram-bot openai supabase requests
 """
-import re, asyncio, requests
+import os, re, asyncio, requests, threading
 from openai import AsyncOpenAI
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
-from youtube_transcript_api import YouTubeTranscriptApi
-from youtube_transcript_api.proxies import WebshareProxyConfig
 from supabase import create_client
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # ── 설정 (Railway 환경변수에서 로드) ────────────────
-import os
 TELEGRAM_TOKEN  = os.environ["TELEGRAM_TOKEN"]
 OPENAI_API_KEY  = os.environ["OPENAI_API_KEY"]
 SUPABASE_URL    = os.environ["SUPABASE_URL"]
 SUPABASE_KEY    = os.environ["SUPABASE_KEY"]
+APIFY_TOKEN     = os.environ.get("APIFY_TOKEN", "")
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-ai = AsyncOpenAI(api_key=OPENAI_API_KEY)
+ai       = AsyncOpenAI(api_key=OPENAI_API_KEY)
 
 PROMPT_TEMPLATE = """당신은 유튜브 영상을 요약하는 전문가입니다.
 youtube transcript가 인입됩니다. 약간의 노이즈가 있기 때문에 그것을 감안하여 아래 요약 템플릿 형태로 요약을 수행해주세요.
@@ -63,7 +62,7 @@ tag안에 들어가는 키워드는 명사
 - 이 정보를 완전히 이해하기 위해 필요한 사전 지식이나 조건
 
 ---
-[TAGS] 태그1, 태그2, 태그3
+[TAGS] 태그1, 태그2, 태그3, 태그4, 태그5
 
 ---
 transcript:
@@ -84,9 +83,7 @@ def extract_video_id(url: str) -> str | None:
 
 def get_transcript(video_id: str) -> str:
     try:
-        apify_token = os.environ.get("APIFY_TOKEN", "")
-        # Apify YouTube Transcript Scraper Actor 호출
-        run_url = f"https://api.apify.com/v2/acts/streamers~youtube-scraper/run-sync-get-dataset-items?token={apify_token}"
+        run_url = f"https://api.apify.com/v2/acts/streamers~youtube-scraper/run-sync-get-dataset-items?token={APIFY_TOKEN}"
         payload = {
             "startUrls": [{"url": f"https://www.youtube.com/watch?v={video_id}"}],
             "maxResults": 1,
@@ -96,11 +93,9 @@ def get_transcript(video_id: str) -> str:
         data = res.json()
         if data and len(data) > 0:
             item = data[0]
-            # 자막 텍스트 추출
             subtitles = item.get("subtitles") or []
             if subtitles:
                 return " ".join(s.get("text", "") for s in subtitles)
-            # 자막 없으면 description
             return item.get("description", "")
         return ""
     except Exception as e:
@@ -111,14 +106,12 @@ def get_thumbnail(video_id: str) -> str:
     return f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
 
 def parse_tags(summary: str) -> list[str]:
-    """[TAGS] 태그1, 태그2, 태그3 형식 파싱"""
     m = re.search(r"\[TAGS\]\s*(.+)", summary)
     if m:
         return [t.strip() for t in m.group(1).split(",") if t.strip()][:5]
     return []
 
 def parse_title(summary: str) -> str:
-    """## 🚀 [제목] 형식에서 제목 추출"""
     m = re.search(r"##\s*🚀\s*(.+?)(?:\s*\(Title\))?$", summary, re.MULTILINE)
     if m:
         return m.group(1).strip().strip("[]")
@@ -173,16 +166,13 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await msg.edit_text(f"❌ 오류 발생: {e}")
 
 # ── 더미 웹서버 (Railway 종료 방지) ─────────────────
-from http.server import HTTPServer, BaseHTTPRequestHandler
-import threading
-
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
         self.wfile.write(b"OK")
     def log_message(self, *args):
-        pass  # 로그 억제
+        pass
 
 def run_web():
     port = int(os.environ.get("PORT", 8080))
@@ -190,9 +180,7 @@ def run_web():
 
 # ── 실행 ─────────────────────────────────────────────
 if __name__ == "__main__":
-    # 웹서버 백그라운드 실행
     threading.Thread(target=run_web, daemon=True).start()
-
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     print("봇 시작!")
