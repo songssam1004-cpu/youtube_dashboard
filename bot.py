@@ -87,19 +87,21 @@ def get_transcript(video_id: str) -> str:
     try:
         proxy_user = os.environ.get("WEBSHARE_PROXY_USER", "")
         proxy_pass = os.environ.get("WEBSHARE_PROXY_PASS", "")
-        if proxy_user and proxy_pass:
-            proxy_config = WebshareProxyConfig(proxy_user, proxy_pass)
-        else:
-            proxy_config = None
+        proxy_config = WebshareProxyConfig(proxy_user, proxy_pass) if proxy_user and proxy_pass else None
         ytt = YouTubeTranscriptApi(proxy_config=proxy_config) if proxy_config else YouTubeTranscriptApi()
-        for lang in [["ko"], ["en"]]:
+
+        # 사용 가능한 자막 목록 먼저 확인
+        transcript_list = ytt.list(video_id)
+        for lang in ["ko", "en"]:
             try:
-                entries = ytt.fetch(video_id, languages=lang)
+                entries = transcript_list.find_transcript([lang]).fetch()
                 return " ".join(e.text for e in entries)
             except Exception:
                 continue
-        entries = ytt.fetch(video_id)
-        return " ".join(e.text for e in entries)
+        # 어떤 언어든 첫 번째 자막 사용
+        for t in transcript_list:
+            entries = t.fetch()
+            return " ".join(e.text for e in entries)
     except Exception as e:
         print(f"트랜스크립트 오류: {e}")
         return ""
