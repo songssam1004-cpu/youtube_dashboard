@@ -157,16 +157,15 @@ if st.session_state.selected:
                     border-radius:8px; text-decoration:none; font-weight:600;">
                     ▶ YouTube에서 보기
                 </a>
-                <a href="{brave_url}" onclick="navigator.clipboard.writeText('{yt_raw}')" style="
+                <a href="{brave_url}" style="
                     background:#ff5500; color:white; padding:8px 16px;
                     border-radius:8px; text-decoration:none; font-weight:600;">
                     🦁 Brave에서 보기
                 </a>
             </div>
-            <p style="font-size:0.75rem; color:#9ca3af; margin-top:6px;">
-                💡 Brave가 열리지 않으면 URL이 클립보드에 복사되어 있어요. Brave 주소창에 붙여넣기 하세요.
-            </p>
             """, unsafe_allow_html=True)
+            st.caption("🔗 URL 직접 복사:")
+            st.code(yt_raw, language=None)
 
     st.markdown("---")
     tab1, tab2, tab3 = st.tabs(["📝 AI 요약", "📄 전체 STT", "💬 챗봇"])
