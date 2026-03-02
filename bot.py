@@ -80,30 +80,30 @@ def extract_video_id(url: str):
     return None
 
 def get_transcript(video_id: str) -> str:
-    try:
-        run_url = f"https://api.apify.com/v2/acts/karamelo~youtube-transcripts/run-sync-get-dataset-items?token={APIFY_TOKEN}&memory=1024&timeout=120"
-        payload = {"urls": [f"https://www.youtube.com/watch?v={video_id}"]}
-        res = requests.post(run_url, json=payload, timeout=180)
-        data = res.json()
-        print(f"Apify 응답: {data}")
-        if data and len(data) > 0:
-            item = data[0]
-            captions = item.get("captions") or []
-            texts = []
-            for c in captions:
-                if c is None:
-                    continue
-                if isinstance(c, str):
-                    texts.append(c)
-                elif isinstance(c, dict):
-                    texts.append(c.get("text", ""))
-            if texts:
-                return " ".join(texts)
-            return item.get("description", "")
-        return ""
-    except Exception as e:
-        print(f"트랜스크립트 오류: {e}")
-        return ""
+    for attempt in range(3):  # 최대 3번 재시도
+        try:
+            run_url = f"https://api.apify.com/v2/acts/karamelo~youtube-transcripts/run-sync-get-dataset-items?token={APIFY_TOKEN}&memory=1024&timeout=120"
+            payload = {"urls": [f"https://www.youtube.com/watch?v={video_id}"]}
+            res = requests.post(run_url, json=payload, timeout=180)
+            data = res.json()
+            print(f"Apify 응답 (시도 {attempt+1}): {str(data)[:200]}")
+            if data and len(data) > 0:
+                item = data[0]
+                captions = item.get("captions") or []
+                texts = []
+                for c in captions:
+                    if c is None:
+                        continue
+                    if isinstance(c, str):
+                        texts.append(c)
+                    elif isinstance(c, dict):
+                        texts.append(c.get("text", ""))
+                if texts:
+                    return " ".join(texts)
+                print(f"captions 비어있음, 재시도 중... ({attempt+1}/3)")
+        except Exception as e:
+            print(f"트랜스크립트 오류 (시도 {attempt+1}): {e}")
+    return ""
 
 def get_thumbnail(video_id: str) -> str:
     return f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
