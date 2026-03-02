@@ -85,12 +85,12 @@ def extract_video_id(url: str) -> str | None:
 
 def get_transcript(video_id: str) -> str:
     try:
-        proxy_config = WebshareProxyConfig(
-            proxy_username=None,
-            proxy_password=None,
-            api_key=os.environ.get("WEBSHARE_API_KEY", "")
-        )
-        ytt = YouTubeTranscriptApi(proxy_config=proxy_config)
+        webshare_key = os.environ.get("WEBSHARE_API_KEY", "")
+        if webshare_key:
+            proxy_config = WebshareProxyConfig(webshare_key)
+        else:
+            proxy_config = None
+        ytt = YouTubeTranscriptApi(proxy_config=proxy_config) if proxy_config else YouTubeTranscriptApi()
         for lang in [["ko"], ["en"]]:
             try:
                 entries = ytt.fetch(video_id, languages=lang)
