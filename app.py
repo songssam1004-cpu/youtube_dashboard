@@ -139,11 +139,71 @@ if st.session_state.selected:
             st.markdown(f"[▶ YouTube에서 보기]({item['youtube_url']})")
 
     st.markdown("---")
-    tab1, tab2 = st.tabs(["📝 AI 요약", "📄 전체 STT"])
+    tab1, tab2, tab3 = st.tabs(["📝 AI 요약", "📄 전체 STT", "💬 챗봇"])
     with tab1:
         st.markdown(item.get("summary_text") or "_요약 내용이 없습니다._")
     with tab2:
         st.text_area("전체 스크립트", item.get("video_stt_url") or "_STT 내용이 없습니다._", height=400)
+    with tab3:
+        st.markdown("#### 💬 영상 내용 기반 챗봇")
+        st.caption("이 영상의 STT 내용을 기반으로 답변하며, 필요 시 일반 지식도 활용합니다.")
+
+        # 챗봇 세션 초기화 (카드별로 독립)
+        chat_key = f"chat_{item['id']}"
+        if chat_key not in st.session_state:
+            st.session_state[chat_key] = []
+
+        # 대화 기록 출력
+        for msg in st.session_state[chat_key]:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+
+        # 입력창
+        if prompt := st.chat_input("영상에 대해 궁금한 점을 물어보세요..."):
+            st.session_state[chat_key].append({"role": "user", "content": prompt})
+            with st.chat_message("user"):
+                st.markdown(prompt)
+
+            with st.chat_message("assistant"):
+                with st.spinner("답변 생성 중..."):
+                    stt = item.get("video_stt_url") or ""
+                    summary = item.get("summary_text") or ""
+                    title = item.get("title") or ""
+
+                    system_prompt = f"""당신은 유튜브 영상 '{title}'의 내용 전문가입니다.
+아래 영상의 전체 스크립트(STT)와 요약을 기반으로 사용자 질문에 답변하세요.
+STT 내용에 없는 질문은 일반 지식을 활용해 답변하되, STT 기반 답변임을 우선시하세요.
+항상 한국어로 답변하세요.
+
+[영상 요약]
+{summary[:2000]}
+
+[전체 STT]
+{stt[:8000]}
+"""
+                    # Anthropic API 호출
+                    import requests as req
+                    messages = [{"role": m["role"], "content": m["content"]}
+                                for m in st.session_state[chat_key]]
+
+                    resp = req.post(
+                        "https://api.anthropic.com/v1/messages",
+                        headers={
+                            "x-api-key": st.secrets.get("anthropic", {}).get("api_key", ""),
+                            "anthropic-version": "2023-06-01",
+                            "content-type": "application/json",
+                        },
+                        json={
+                            "model": "claude-sonnet-4-20250514",
+                            "max_tokens": 1024,
+                            "system": system_prompt,
+                            "messages": messages,
+                        },
+                        timeout=30,
+                    )
+                    answer = resp.json()["content"][0]["text"]
+                    st.markdown(answer)
+                    st.session_state[chat_key].append({"role": "assistant", "content": answer})
     st.stop()
 
 # ── 사이드바 ─────────────────────────────────────────
