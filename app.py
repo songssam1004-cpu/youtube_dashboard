@@ -149,20 +149,25 @@ if st.session_state.selected:
             yt_url = item["youtube_url"]
             video_id = yt_url.split("v=")[-1].split("&")[0] if "v=" in yt_url else ""
             yt_raw = f"https://www.youtube.com/watch?v={video_id}"
-            brave_url = f"brave://open-url?url={yt_raw}"
             st.markdown(f"""
-            <div style="display:flex; gap:12px; margin-top:8px;">
+            <div style="display:flex; gap:12px; margin-top:8px; flex-wrap:wrap;">
                 <a href="{yt_url}" target="_blank" style="
                     background:#ff0000; color:white; padding:8px 16px;
                     border-radius:8px; text-decoration:none; font-weight:600;">
                     ▶ YouTube에서 보기
                 </a>
-                <a href="{brave_url}" style="
+                <button onclick="navigator.clipboard.writeText('{yt_raw}').then(()=>{{
+                    this.innerText='✅ 복사됨!';
+                    setTimeout(()=>this.innerText='🦁 Brave에서 보기 (URL 복사)',1500);
+                }})" style="
                     background:#ff5500; color:white; padding:8px 16px;
-                    border-radius:8px; text-decoration:none; font-weight:600;">
-                    🦁 Brave에서 보기
-                </a>
+                    border-radius:8px; border:none; font-weight:600; cursor:pointer; font-size:1rem;">
+                    🦁 Brave에서 보기 (URL 복사)
+                </button>
             </div>
+            <p style="font-size:0.75rem; color:#9ca3af; margin-top:6px;">
+                💡 복사 후 Brave 앱을 열고 주소창에 붙여넣기 하세요.
+            </p>
             """, unsafe_allow_html=True)
 
     st.markdown("---")
