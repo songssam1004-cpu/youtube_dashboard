@@ -149,6 +149,7 @@ if st.session_state.selected:
             yt_url = item["youtube_url"]
             video_id = yt_url.split("v=")[-1].split("&")[0] if "v=" in yt_url else ""
             yt_raw = f"https://www.youtube.com/watch?v={video_id}"
+            brave_url = f"brave://open-url?url=https://www.youtube.com/watch?v={video_id}"
             st.markdown(f"""
             <div style="display:flex; gap:12px; margin-top:8px; flex-wrap:wrap;">
                 <a href="{yt_url}" target="_blank" style="
@@ -156,19 +157,14 @@ if st.session_state.selected:
                     border-radius:8px; text-decoration:none; font-weight:600;">
                     ▶ YouTube에서 보기
                 </a>
-                <button onclick="
-                    navigator.clipboard.writeText('{yt_raw}');
-                    this.innerText='✅ 복사됨! Brave 실행 중...';
-                    setTimeout(()=>this.innerText='🦁 Brave에서 보기', 2000);
-                    window.location.href='brave://';
-                " style="
+                <a href="{brave_url}" onclick="navigator.clipboard.writeText('{yt_raw}')" style="
                     background:#ff5500; color:white; padding:8px 16px;
-                    border-radius:8px; border:none; font-weight:600; cursor:pointer; font-size:1rem;">
+                    border-radius:8px; text-decoration:none; font-weight:600;">
                     🦁 Brave에서 보기
-                </button>
+                </a>
             </div>
             <p style="font-size:0.75rem; color:#9ca3af; margin-top:6px;">
-                💡 URL이 복사되고 Brave가 실행돼요. 주소창에 붙여넣기 하세요.
+                💡 Brave가 열리지 않으면 URL이 클립보드에 복사되어 있어요. Brave 주소창에 붙여넣기 하세요.
             </p>
             """, unsafe_allow_html=True)
 
