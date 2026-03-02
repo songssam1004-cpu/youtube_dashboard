@@ -193,7 +193,16 @@ if search_q != st.session_state.prev_search or selected_tag != st.session_state.
 data, total = fetch_summaries(st.session_state.page, search_q, selected_tag)
 total_pages = max(1, math.ceil((total or 0) / PAGE_SIZE))
 
-# ── 헤더 ─────────────────────────────────────────────
+# ── URL 파라미터로 특정 카드 자동 오픈 ──────────────
+params = st.query_params
+if "card" in params and not st.session_state.selected:
+    card_id = params["card"]
+    client = get_client()
+    res = client.table("youtube_summaries").select("*").eq("id", card_id).execute()
+    if res.data:
+        st.session_state.selected = res.data[0]
+
+
 st.markdown("### 📺 나의 유튜브 요약 대시보드")
 st.caption(f"총 {total or 0}개의 요약 · {st.session_state.page}/{total_pages} 페이지")
 st.markdown("---")
