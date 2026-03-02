@@ -156,17 +156,19 @@ if st.session_state.selected:
                     border-radius:8px; text-decoration:none; font-weight:600;">
                     ▶ YouTube에서 보기
                 </a>
-                <button onclick="navigator.clipboard.writeText('{yt_raw}').then(()=>{{
-                    this.innerText='✅ 복사됨!';
-                    setTimeout(()=>this.innerText='🦁 Brave에서 보기 (URL 복사)',1500);
-                }})" style="
+                <button onclick="
+                    navigator.clipboard.writeText('{yt_raw}');
+                    this.innerText='✅ 복사됨! Brave 실행 중...';
+                    setTimeout(()=>{{ window.location.href='brave://'; }}, 300);
+                    setTimeout(()=>this.innerText='🦁 Brave에서 보기',2000);
+                " style="
                     background:#ff5500; color:white; padding:8px 16px;
                     border-radius:8px; border:none; font-weight:600; cursor:pointer; font-size:1rem;">
-                    🦁 Brave에서 보기 (URL 복사)
+                    🦁 Brave에서 보기
                 </button>
             </div>
             <p style="font-size:0.75rem; color:#9ca3af; margin-top:6px;">
-                💡 복사 후 Brave 앱을 열고 주소창에 붙여넣기 하세요.
+                💡 URL이 복사되고 Brave가 실행돼요. 주소창에 붙여넣기 하세요.
             </p>
             """, unsafe_allow_html=True)
 
