@@ -158,9 +158,9 @@ if st.session_state.selected:
                 </a>
                 <button onclick="
                     navigator.clipboard.writeText('{yt_raw}');
-                    this.innerText='✅ 복사됨!';
+                    this.innerText='✅ 복사됨! Brave 실행 중...';
                     setTimeout(()=>this.innerText='🦁 Brave에서 보기', 2000);
-                    window.open('brave://open-url?url={yt_raw}', '_blank');
+                    window.location.href='brave://';
                 " style="
                     background:#ff5500; color:white; padding:8px 16px;
                     border-radius:8px; border:none; font-weight:600; cursor:pointer; font-size:1rem;">
@@ -168,7 +168,7 @@ if st.session_state.selected:
                 </button>
             </div>
             <p style="font-size:0.75rem; color:#9ca3af; margin-top:6px;">
-                💡 URL이 복사돼요. Brave가 열리지 않으면 직접 실행 후 붙여넣기 하세요.
+                💡 URL이 복사되고 Brave가 실행돼요. 주소창에 붙여넣기 하세요.
             </p>
             """, unsafe_allow_html=True)
 
