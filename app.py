@@ -136,7 +136,13 @@ if st.session_state.selected:
             st.markdown(" ".join(f"`#{t}`" for t in tags))
         st.markdown(f"📅 {(item.get('created_at') or '')[:10]}")
         if item.get("youtube_url"):
-            st.markdown(f"[▶ YouTube에서 보기]({item['youtube_url']})")
+            yt_url = item["youtube_url"]
+            brave_url = f"brave://www.youtube.com/watch?v={item.get('youtube_url', '').split('v=')[-1]}"
+            col_yt, col_brave = st.columns(2)
+            with col_yt:
+                st.markdown(f"[▶ YouTube에서 보기]({yt_url})")
+            with col_brave:
+                st.markdown(f"[🦁 Brave에서 보기]({brave_url})")
 
     st.markdown("---")
     tab1, tab2, tab3 = st.tabs(["📝 AI 요약", "📄 전체 STT", "💬 챗봇"])
