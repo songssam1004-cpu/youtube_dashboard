@@ -250,8 +250,6 @@ with st.sidebar:
         tag_choice = st.selectbox("🏷️ 태그 필터", ["전체"] + all_tags)
         selected_tag = "" if tag_choice == "전체" else tag_choice
     st.markdown("---")
-    st.button("👤 로그인", use_container_width=True)
-    st.button("✨ 회원가입", use_container_width=True, type="primary")
 
 # ── 검색/필터 변경 시 페이지 리셋 ────────────────────
 for k, v in [("prev_search", ""), ("prev_tag", "")]:
