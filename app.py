@@ -291,12 +291,18 @@ else:
                     if thumb else
                     '<div class="yt-thumb-placeholder">🎬</div>'
                 )
+                source = item.get("source_type", "youtube")
+                badge = "🎬" if source == "youtube" else "📸"
+                badge_color = "#ff0000" if source == "youtube" else "#833ab4"
                 tags_html = "".join(f'<span class="yt-tag">#{t}</span>' for t in tags[:5])
 
                 st.markdown(f"""
                 <div class="yt-card">
                     {thumb_html}
                     <div class="yt-body">
+                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+                            <span style="background:{badge_color}; color:white; font-size:0.65rem; padding:2px 6px; border-radius:10px;">{badge} {'YouTube' if source == 'youtube' else 'Instagram'}</span>
+                        </div>
                         <div class="yt-title">{title}</div>
                         <div class="yt-tags">{tags_html}</div>
                         <div class="yt-date">📅 {date}</div>
