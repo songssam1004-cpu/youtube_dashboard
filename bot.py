@@ -205,6 +205,8 @@ def save_to_db(data: dict) -> str:
 # ── 텔레그램 핸들러 ──────────────────────────────────
 async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     text = (update.message.text or "").strip()
+    print(f"수신된 메시지: {text}")
+    print(f"is_youtube: {is_youtube(text)}, is_instagram: {is_instagram(text)}")
 
     # ── YouTube 처리 ──────────────────────────────────
     if is_youtube(text):
