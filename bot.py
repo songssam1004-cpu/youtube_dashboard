@@ -5,7 +5,7 @@ from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filte
 from supabase import create_client
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-# ── 설정 (Railway 환경변수에서 로드) ────────────────
+# ── 설정 ────────────────────────────────────────────
 TELEGRAM_TOKEN  = os.environ["TELEGRAM_TOKEN"]
 OPENAI_API_KEY  = os.environ["OPENAI_API_KEY"]
 SUPABASE_URL    = os.environ["SUPABASE_URL"]
@@ -16,7 +16,7 @@ DASHBOARD_URL   = os.environ.get("DASHBOARD_URL", "")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 ai       = AsyncOpenAI(api_key=OPENAI_API_KEY)
 
-PROMPT_TEMPLATE = """당신은 유튜브 영상을 요약하는 전문가입니다.
+YOUTUBE_PROMPT = """당신은 유튜브 영상을 요약하는 전문가입니다.
 youtube transcript가 인입됩니다. 약간의 노이즈가 있기 때문에 그것을 감안하여 아래 요약 템플릿 형태로 요약을 수행해주세요.
 또한 keyword tag도 5개 정도 정의해서 출력
 tag안에 들어가는 키워드는 명사
@@ -37,7 +37,7 @@ tag안에 들어가는 키워드는 명사
 - 핵심 요약에서 제시된 내용에 대한 구체적인 설명, 배경 또는 주요 특징 기술
 
 ### 🤔 비판적 관점 (Critical Points)
-- 해당 내용에 대해 주의 깊게 생각하거나 경계해야 할 지점, 또는 더 깊이 생각해 볼 만한 질문 제시
+- 해당 내용에 대해 주의 깊게 생각하거나 경계해야 할 지점
     - Point 1
     - Point 2
 
@@ -64,9 +64,43 @@ tag안에 들어가는 키워드는 명사
 
 ---
 transcript:
-{transcript}
+{content}
 """
 
+INSTAGRAM_PROMPT = """당신은 인스타그램 게시물을 요약하는 전문가입니다.
+아래 인스타그램 캐션(caption) 텍스트를 분석하고 요약해주세요.
+keyword tag도 5개 정도 정의해서 출력 (tag는 명사)
+
+---
+## 📸 [제목] (Title)
+
+### 💡 핵심 메시지 (Key Message)
+- 게시물의 핵심 메시지를 한 줄로 요약
+
+### ✨ 주요 내용 (Key Points)
+- 중요한 내용 3가지
+    - Point 1
+    - Point 2
+    - Point 3
+
+### 📚 상세 내용 (Details)
+- 게시물의 구체적인 내용, 맥락 설명
+
+### 🤔 인사이트 (Insights)
+- 이 게시물에서 얻을 수 있는 인사이트나 시사점
+
+### 👟 액션 아이템 (Action Item)
+- 이 게시물을 보고 바로 실행할 수 있는 행동 1가지
+
+---
+[TAGS] 태그1, 태그2, 태그3, 태그4, 태그5
+
+---
+caption:
+{content}
+"""
+
+# ── 유틸 함수 ────────────────────────────────────────
 def extract_video_id(url: str):
     patterns = [
         r"(?:v=|youtu\.be/|shorts/)([A-Za-z0-9_-]{11})",
@@ -78,14 +112,21 @@ def extract_video_id(url: str):
             return m.group(1)
     return None
 
-def get_transcript(video_id: str) -> str:
+def is_youtube(url: str) -> bool:
+    return "youtube.com" in url or "youtu.be" in url
+
+def is_instagram(url: str) -> bool:
+    return "instagram.com" in url
+
+# ── YouTube 트랜스크립트 ─────────────────────────────
+def get_youtube_transcript(video_id: str) -> str:
     for attempt in range(3):
         try:
             run_url = f"https://api.apify.com/v2/acts/karamelo~youtube-transcripts/run-sync-get-dataset-items?token={APIFY_TOKEN}&memory=1024&timeout=120"
             payload = {"urls": [f"https://www.youtube.com/watch?v={video_id}"]}
             res = requests.post(run_url, json=payload, timeout=180)
             data = res.json()
-            print(f"Apify 응답 (시도 {attempt+1}): {str(data)[:200]}")
+            print(f"Apify YouTube 응답 (시도 {attempt+1}): {str(data)[:200]}")
             if data and len(data) > 0:
                 item = data[0]
                 captions = item.get("captions") or []
@@ -101,8 +142,32 @@ def get_transcript(video_id: str) -> str:
                     return " ".join(texts)
                 print(f"captions 비어있음, 재시도 중... ({attempt+1}/3)")
         except Exception as e:
-            print(f"트랜스크립트 오류 (시도 {attempt+1}): {e}")
+            print(f"YouTube 트랜스크립트 오류 (시도 {attempt+1}): {e}")
     return ""
+
+# ── Instagram 캐션 ───────────────────────────────────
+def get_instagram_data(url: str) -> dict:
+    try:
+        run_url = f"https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?token={APIFY_TOKEN}&memory=1024&timeout=120"
+        payload = {
+            "directUrls": [url],
+            "resultsType": "posts",
+            "resultsLimit": 1,
+        }
+        res = requests.post(run_url, json=payload, timeout=180)
+        data = res.json()
+        print(f"Apify Instagram 응답: {str(data)[:300]}")
+        if data and len(data) > 0:
+            item = data[0]
+            return {
+                "caption":       item.get("caption") or item.get("text") or "",
+                "thumbnail_url": item.get("displayUrl") or item.get("thumbnailUrl") or "",
+                "owner":         item.get("ownerUsername") or "",
+                "likes":         item.get("likesCount") or 0,
+            }
+    except Exception as e:
+        print(f"Instagram 오류: {e}")
+    return {}
 
 def get_thumbnail(video_id: str) -> str:
     return f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
@@ -114,73 +179,104 @@ def parse_tags(summary: str) -> list:
     return []
 
 def parse_title(summary: str) -> str:
-    m = re.search(r"##\s*🚀\s*(.+?)(?:\s*\(Title\))?$", summary, re.MULTILINE)
+    m = re.search(r"##\s*[🚀📸]\s*(.+?)(?:\s*\(Title\))?$", summary, re.MULTILINE)
     if m:
         return m.group(1).strip().strip("[]")
     return "제목 없음"
 
 def parse_one_line(summary: str) -> str:
-    m = re.search(r"핵심 비유.*?\n-\s*(.+)", summary)
-    if m:
-        return m.group(1).strip()
-    m = re.search(r"Point 1\n\s*-\s*(.+)", summary)
+    m = re.search(r"(?:핵심 비유|핵심 메시지).*?\n-\s*(.+)", summary)
     if m:
         return m.group(1).strip()
     return ""
 
-async def summarize(transcript: str) -> str:
+async def summarize(content: str, prompt_template: str) -> str:
     res = await ai.chat.completions.create(
         model="gpt-4o",
         max_tokens=4096,
-        messages=[{"role": "user", "content": PROMPT_TEMPLATE.format(transcript=transcript[:12000])}]
+        messages=[{"role": "user", "content": prompt_template.format(content=content[:12000])}]
     )
     return res.choices[0].message.content
 
-def save_to_db(youtube_url, video_id, title, summary, transcript, tags) -> str:
-    res = supabase.table("youtube_summaries").insert({
-        "youtube_url":   youtube_url,
-        "title":         title,
-        "thumbnail_url": get_thumbnail(video_id),
-        "summary_text":  summary,
-        "tags":          tags,
-        "video_stt_url": transcript,
-    }).execute()
+def save_to_db(data: dict) -> str:
+    res = supabase.table("youtube_summaries").insert(data).execute()
     return res.data[0]["id"] if res.data else ""
 
+# ── 텔레그램 핸들러 ──────────────────────────────────
 async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     text = (update.message.text or "").strip()
-    if "youtube.com" not in text and "youtu.be" not in text:
-        await update.message.reply_text("유튜브 링크를 보내주세요! 🎬")
-        return
 
-    video_id = extract_video_id(text)
-    if not video_id:
-        await update.message.reply_text("유효한 유튜브 링크를 찾을 수 없어요 😢")
-        return
+    # ── YouTube 처리 ──────────────────────────────────
+    if is_youtube(text):
+        video_id = extract_video_id(text)
+        if not video_id:
+            await update.message.reply_text("유효한 유튜브 링크를 찾을 수 없어요 😢")
+            return
 
-    msg = await update.message.reply_text("⏳ 트랜스크립트 가져오는 중...")
+        msg = await update.message.reply_text("⏳ 트랜스크립트 가져오는 중...")
+        transcript = get_youtube_transcript(video_id)
+        if not transcript:
+            await msg.edit_text("❌ 자막/트랜스크립트를 가져올 수 없는 영상이에요.")
+            return
 
-    transcript = get_transcript(video_id)
-    if not transcript:
-        await msg.edit_text("❌ 자막/트랜스크립트를 가져올 수 없는 영상이에요.")
-        return
+        await msg.edit_text("🤖 AI 요약 중... (약 30초 소요)")
+        try:
+            summary  = await summarize(transcript, YOUTUBE_PROMPT)
+            title    = parse_title(summary)
+            tags     = parse_tags(summary)
+            one_line = parse_one_line(summary)
+            item_id  = save_to_db({
+                "youtube_url":   text,
+                "title":         title,
+                "thumbnail_url": get_thumbnail(video_id),
+                "summary_text":  summary,
+                "tags":          tags,
+                "video_stt_url": transcript,
+                "source_type":   "youtube",
+            })
+            reply = f"✅ 요약 완료!\n\n📌 *{title}*\n💡 {one_line}\n🏷️ {' '.join(f'#{t}' for t in tags)}"
+            if DASHBOARD_URL and item_id:
+                reply += f"\n\n🔗 [대시보드에서 보기]({DASHBOARD_URL}?card={item_id})"
+            await msg.edit_text(reply, parse_mode="Markdown")
+        except Exception as e:
+            await msg.edit_text(f"❌ 오류 발생: {e}")
 
-    await msg.edit_text("🤖 AI 요약 중... (약 30초 소요)")
+    # ── Instagram 처리 ────────────────────────────────
+    elif is_instagram(text):
+        msg = await update.message.reply_text("⏳ 인스타그램 게시물 가져오는 중...")
+        ig_data = get_instagram_data(text)
+        caption = ig_data.get("caption", "")
+        if not caption:
+            await msg.edit_text("❌ 캐션을 가져올 수 없는 게시물이에요.")
+            return
 
-    try:
-        summary  = await summarize(transcript)
-        title    = parse_title(summary)
-        tags     = parse_tags(summary)
-        one_line = parse_one_line(summary)
-        item_id  = save_to_db(text, video_id, title, summary, transcript, tags)
+        await msg.edit_text("🤖 AI 요약 중... (약 30초 소요)")
+        try:
+            summary  = await summarize(caption, INSTAGRAM_PROMPT)
+            title    = parse_title(summary)
+            tags     = parse_tags(summary)
+            one_line = parse_one_line(summary)
+            item_id  = save_to_db({
+                "youtube_url":   text,
+                "instagram_url": text,
+                "title":         title,
+                "thumbnail_url": ig_data.get("thumbnail_url", ""),
+                "summary_text":  summary,
+                "tags":          tags,
+                "video_stt_url": caption,
+                "source_type":   "instagram",
+            })
+            reply = f"✅ 요약 완료!\n\n📸 *{title}*\n💡 {one_line}\n🏷️ {' '.join(f'#{t}' for t in tags)}"
+            if DASHBOARD_URL and item_id:
+                reply += f"\n\n🔗 [대시보드에서 보기]({DASHBOARD_URL}?card={item_id})"
+            await msg.edit_text(reply, parse_mode="Markdown")
+        except Exception as e:
+            await msg.edit_text(f"❌ 오류 발생: {e}")
 
-        reply = f"✅ 요약 완료!\n\n📌 *{title}*\n💡 {one_line}\n🏷️ {' '.join(f'#{t}' for t in tags)}"
-        if DASHBOARD_URL and item_id:
-            reply += f"\n\n🔗 [대시보드에서 보기]({DASHBOARD_URL}?card={item_id})"
-        await msg.edit_text(reply, parse_mode="Markdown")
-    except Exception as e:
-        await msg.edit_text(f"❌ 오류 발생: {e}")
+    else:
+        await update.message.reply_text("유튜브 또는 인스타그램 링크를 보내주세요! 🎬📸")
 
+# ── 더미 웹서버 (Railway 종료 방지) ─────────────────
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -193,6 +289,7 @@ def run_web():
     port = int(os.environ.get("PORT", 8080))
     HTTPServer(("0.0.0.0", port), HealthHandler).serve_forever()
 
+# ── 실행 ─────────────────────────────────────────────
 if __name__ == "__main__":
     threading.Thread(target=run_web, daemon=True).start()
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
