@@ -5,8 +5,6 @@ from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filte
 from supabase import create_client
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-
-
 # ── 설정 ────────────────────────────────────────────
 TELEGRAM_TOKEN  = os.environ["TELEGRAM_TOKEN"]
 OPENAI_API_KEY  = os.environ["OPENAI_API_KEY"]
@@ -161,9 +159,17 @@ def get_instagram_data(url: str) -> dict:
         print(f"Apify Instagram 응답: {str(data)[:300]}")
         if data and len(data) > 0:
             item = data[0]
+            # 릴스 커버 이미지 우선순위: thumbnailUrl → displayUrl → images[0]
+            thumbnail = (
+                item.get("thumbnailUrl") or
+                item.get("coverImageUrl") or
+                item.get("displayUrl") or
+                (item.get("images") or [None])[0] or
+                ""
+            )
             return {
                 "caption":       item.get("caption") or item.get("text") or "",
-                "thumbnail_url": item.get("displayUrl") or item.get("thumbnailUrl") or "",
+                "thumbnail_url": thumbnail,
                 "owner":         item.get("ownerUsername") or "",
                 "likes":         item.get("likesCount") or 0,
             }
