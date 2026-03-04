@@ -138,15 +138,8 @@ if st.session_state.selected:
 
     col_thumb, col_info = st.columns([1, 2])
     with col_thumb:
-        thumb = item.get("thumbnail_url", "")
-        source = item.get("source_type", "youtube")
-        if thumb:
-            try:
-                st.image(thumb, use_container_width=True)
-            except Exception:
-                st.markdown(f"<div style='background:{'#833ab4' if source=='instagram' else '#ff0000'};border-radius:12px;padding:40px;text-align:center;font-size:3rem;'>{'📸' if source=='instagram' else '🎬'}</div>", unsafe_allow_html=True)
-        else:
-            st.markdown(f"<div style='background:{'#833ab4' if source=='instagram' else '#ff0000'};border-radius:12px;padding:40px;text-align:center;font-size:3rem;'>{'📸' if source=='instagram' else '🎬'}</div>", unsafe_allow_html=True)
+        if item.get("thumbnail_url"):
+            st.image(item["thumbnail_url"], use_container_width=True)
     with col_info:
         tags = item.get("tags") or []
         if tags:
