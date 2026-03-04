@@ -43,14 +43,6 @@ def delete_summary(item_id: str):
     client = get_client()
     client.table("youtube_summaries").delete().eq("id", item_id).execute()
 
-def fetch_all_tags():
-    try:
-        res = client.table("youtube_summaries").select("tags").execute()
-        return res.data
-    except Exception as e:
-        print(f"APIError 상세: {e}")  # 전체 에러 내용 출력
-        raise
-
 # ── 페이지 설정 ──────────────────────────────────────
 st.set_page_config(page_title="내 유튜브 요약 대시보드", layout="wide", page_icon="🎬", initial_sidebar_state="auto")
 
@@ -167,7 +159,6 @@ if st.session_state.selected:
             yt_short = f"https://youtu.be/{video_id}"
 
             if source == "instagram":
-                # 인스타그램 보기 버튼
                 st.markdown(f"""
                 <div style="display:flex; gap:12px; margin-top:8px; flex-wrap:wrap;">
                     <a href="{yt_url}" target="_blank" style="
@@ -178,7 +169,6 @@ if st.session_state.selected:
                 </div>
                 """, unsafe_allow_html=True)
             else:
-                # 유튜브 보기 버튼
                 brave_url = f"brave://open-url?url={yt_short}"
                 st.markdown(f"""
                 <div style="display:flex; gap:12px; margin-top:8px; flex-wrap:wrap;">
@@ -207,17 +197,14 @@ if st.session_state.selected:
         st.markdown("#### 💬 영상 내용 기반 챗봇")
         st.caption("이 영상의 STT 내용을 기반으로 답변하며, 필요 시 일반 지식도 활용합니다.")
 
-        # 챗봇 세션 초기화 (카드별로 독립)
         chat_key = f"chat_{item['id']}"
         if chat_key not in st.session_state:
             st.session_state[chat_key] = []
 
-        # 대화 기록 출력
         for msg in st.session_state[chat_key]:
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
 
-        # 입력창
         if prompt := st.chat_input("영상에 대해 궁금한 점을 물어보세요..."):
             st.session_state[chat_key].append({"role": "user", "content": prompt})
             with st.chat_message("user"):
