@@ -27,6 +27,10 @@ def fetch_summaries(page: int, search: str = "", tag: str = ""):
 
 def fetch_one(item_id: str):
     client = get_client()
+    # UUID 형식 기본 검증
+    item_id = str(item_id).strip()
+    if not item_id:
+        return None
     res = client.table("youtube_summaries").select("*").eq("id", item_id).execute()
     return res.data[0] if res.data else None
 
@@ -121,10 +125,21 @@ for k, v in [("page", 1), ("selected", None), ("confirm_delete", None)]:
 # ── URL 파라미터로 특정 카드 자동 오픈 ──────────────
 params = st.query_params
 if "card" in params and not st.session_state.selected:
-    item = fetch_one(params["card"])
-    if item:
-        st.session_state.selected = item
-
+    # query_params 값이 리스트로 올 수 있으므로 안전하게 추출
+    card_val = params["card"]
+    if isinstance(card_val, list):
+        card_val = card_val[0]
+    card_val = str(card_val).strip()
+    
+    if card_val:  # 빈 문자열 방지
+        try:
+            item = fetch_one(card_val)
+            if item:
+                st.session_state.selected = item
+        except Exception as e:
+            st.warning(f"카드를 불러오지 못했습니다: {e}")
+            st.query_params.clear()
+            
 # ── 상세 페이지 뷰 ───────────────────────────────────
 if st.session_state.selected:
     item = st.session_state.selected
