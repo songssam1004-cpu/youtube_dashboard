@@ -101,6 +101,12 @@ caption:
 """
 
 # ── 유틸 함수 ────────────────────────────────────────
+def is_youtube(url: str) -> bool:
+    return "youtube.com" in url or "youtu.be" in url
+
+def is_instagram(url: str) -> bool:
+    return "instagram.com" in url
+
 def extract_video_id(url: str):
     patterns = [
         r"(?:v=|youtu\.be/|shorts/)([A-Za-z0-9_-]{11})",
@@ -112,11 +118,57 @@ def extract_video_id(url: str):
             return m.group(1)
     return None
 
-def is_youtube(url: str) -> bool:
-    return "youtube.com" in url or "youtu.be" in url
+def get_thumbnail(video_id: str) -> str:
+    return f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
 
-def is_instagram(url: str) -> bool:
-    return "instagram.com" in url
+def parse_tags(summary: str) -> list:
+    m = re.search(r"\[TAGS\]\s*(.+)", summary)
+    if m:
+        return [t.strip() for t in m.group(1).split(",") if t.strip()][:5]
+    return []
+
+def parse_title(summary: str) -> str:
+    m = re.search(r"##\s*[🚀📸]\s*(.+?)(?:\s*\(Title\))?$", summary, re.MULTILINE)
+    if m:
+        return m.group(1).strip().strip("[]")
+    return "제목 없음"
+
+def parse_one_line(summary: str) -> str:
+    m = re.search(r"(?:핵심 비유|핵심 메시지).*?\n-\s*(.+)", summary)
+    if m:
+        return m.group(1).strip()
+    return ""
+
+def upload_thumbnail(image_url: str, item_id: str) -> str:
+    try:
+        res = requests.get(image_url, timeout=30)
+        if res.status_code != 200:
+            return image_url
+        content_type = res.headers.get("Content-Type", "image/jpeg")
+        ext = "png" if "png" in content_type else "webp" if "webp" in content_type else "jpg"
+        file_path = f"{item_id}.{ext}"
+        supabase.storage.from_("thumbnails").upload(
+            file_path, res.content,
+            {"content-type": content_type, "upsert": "true"}
+        )
+        public_url = f"{SUPABASE_URL}/storage/v1/object/public/thumbnails/{file_path}"
+        print(f"썸네일 업로드 완료: {public_url}")
+        return public_url
+    except Exception as e:
+        print(f"썸네일 업로드 오류: {e}")
+        return image_url
+
+def save_to_db(data: dict) -> str:
+    res = supabase.table("youtube_summaries").insert(data).execute()
+    return res.data[0]["id"] if res.data else ""
+
+async def summarize(content: str, prompt_template: str) -> str:
+    res = await ai.chat.completions.create(
+        model="gpt-4o",
+        max_tokens=4096,
+        messages=[{"role": "user", "content": prompt_template.format(content=content[:12000])}]
+    )
+    return res.choices[0].message.content
 
 # ── YouTube 트랜스크립트 ─────────────────────────────
 def get_youtube_transcript(video_id: str) -> str:
@@ -145,7 +197,7 @@ def get_youtube_transcript(video_id: str) -> str:
             print(f"YouTube 트랜스크립트 오류 (시도 {attempt+1}): {e}")
     return ""
 
-# ── Instagram 캐션 ───────────────────────────────────
+# ── Instagram 데이터 ─────────────────────────────────
 def get_instagram_data(url: str) -> dict:
     try:
         run_url = f"https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?token={APIFY_TOKEN}&memory=1024&timeout=120"
@@ -159,13 +211,11 @@ def get_instagram_data(url: str) -> dict:
         print(f"Apify Instagram 응답: {str(data)[:300]}")
         if data and len(data) > 0:
             item = data[0]
-            # 릴스 커버 이미지 우선순위: thumbnailUrl → displayUrl → images[0]
             thumbnail = (
                 item.get("thumbnailUrl") or
                 item.get("coverImageUrl") or
                 item.get("displayUrl") or
-                (item.get("images") or [None])[0] or
-                ""
+                (item.get("images") or [None])[0] or ""
             )
             return {
                 "caption":       item.get("caption") or item.get("text") or "",
@@ -177,71 +227,12 @@ def get_instagram_data(url: str) -> dict:
         print(f"Instagram 오류: {e}")
     return {}
 
-def upload_thumbnail(image_url: str, item_id: str) -> str:
-    """이미지를 Supabase Storage에 업로드 후 public URL 반환"""
-    try:
-        res = requests.get(image_url, timeout=30)
-        if res.status_code != 200:
-            return image_url
-        ext = "jpg"
-        content_type = res.headers.get("Content-Type", "image/jpeg")
-        if "png" in content_type:
-            ext = "png"
-        elif "webp" in content_type:
-            ext = "webp"
-        file_path = f"{item_id}.{ext}"
-        supabase.storage.from_("thumbnails").upload(
-            file_path,
-            res.content,
-            {"content-type": content_type, "upsert": "true"}
-        )
-        public_url = f"{SUPABASE_URL}/storage/v1/object/public/thumbnails/{file_path}"
-        print(f"썸네일 업로드 완료: {public_url}")
-        return public_url
-    except Exception as e:
-        print(f"썸네일 업로드 오류: {e}")
-        return image_url
-
-def get_thumbnail(video_id: str) -> str:
-    return f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
-
-
-    m = re.search(r"\[TAGS\]\s*(.+)", summary)
-    if m:
-        return [t.strip() for t in m.group(1).split(",") if t.strip()][:5]
-    return []
-
-def parse_title(summary: str) -> str:
-    m = re.search(r"##\s*[🚀📸]\s*(.+?)(?:\s*\(Title\))?$", summary, re.MULTILINE)
-    if m:
-        return m.group(1).strip().strip("[]")
-    return "제목 없음"
-
-def parse_one_line(summary: str) -> str:
-    m = re.search(r"(?:핵심 비유|핵심 메시지).*?\n-\s*(.+)", summary)
-    if m:
-        return m.group(1).strip()
-    return ""
-
-async def summarize(content: str, prompt_template: str) -> str:
-    res = await ai.chat.completions.create(
-        model="gpt-4o",
-        max_tokens=4096,
-        messages=[{"role": "user", "content": prompt_template.format(content=content[:12000])}]
-    )
-    return res.choices[0].message.content
-
-def save_to_db(data: dict) -> str:
-    res = supabase.table("youtube_summaries").insert(data).execute()
-    return res.data[0]["id"] if res.data else ""
-
 # ── 텔레그램 핸들러 ──────────────────────────────────
 async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     text = (update.message.text or "").strip()
     print(f"수신된 메시지: {text}")
     print(f"is_youtube: {is_youtube(text)}, is_instagram: {is_instagram(text)}")
 
-    # ── YouTube 처리 ──────────────────────────────────
     if is_youtube(text):
         video_id = extract_video_id(text)
         if not video_id:
@@ -269,14 +260,13 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 "video_stt_url": transcript,
                 "source_type":   "youtube",
             })
-            reply = f"✅ 요약 완료!\n\n📌 *{title}*\n💡 {one_line}\n🏷️ {' '.join(f'#{t}' for t in tags)}"
+            reply = f"✅ 요약 완료!\n\n🎬 *{title}*\n💡 {one_line}\n🏷️ {' '.join(f'#{t}' for t in tags)}"
             if DASHBOARD_URL and item_id:
                 reply += f"\n\n🔗 [대시보드에서 보기]({DASHBOARD_URL}?card={item_id})"
             await msg.edit_text(reply, parse_mode="Markdown")
         except Exception as e:
             await msg.edit_text(f"❌ 오류 발생: {e}")
 
-    # ── Instagram 처리 ────────────────────────────────
     elif is_instagram(text):
         msg = await update.message.reply_text("⏳ 인스타그램 게시물 가져오는 중...")
         ig_data = get_instagram_data(text)
@@ -291,8 +281,6 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             title    = parse_title(summary)
             tags     = parse_tags(summary)
             one_line = parse_one_line(summary)
-
-            # 임시 저장 후 썸네일 업로드
             item_id  = save_to_db({
                 "youtube_url":   text,
                 "instagram_url": text,
@@ -303,13 +291,13 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 "video_stt_url": caption,
                 "source_type":   "instagram",
             })
-
             # 썸네일 Supabase Storage에 업로드
             if item_id and ig_data.get("thumbnail_url"):
                 public_url = upload_thumbnail(ig_data["thumbnail_url"], item_id)
                 supabase.table("youtube_summaries").update(
                     {"thumbnail_url": public_url}
                 ).eq("id", item_id).execute()
+
             reply = f"✅ 요약 완료!\n\n📸 *{title}*\n💡 {one_line}\n🏷️ {' '.join(f'#{t}' for t in tags)}"
             if DASHBOARD_URL and item_id:
                 reply += f"\n\n🔗 [대시보드에서 보기]({DASHBOARD_URL}?card={item_id})"
