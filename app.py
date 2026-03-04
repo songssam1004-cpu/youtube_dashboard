@@ -43,6 +43,14 @@ def delete_summary(item_id: str):
     client = get_client()
     client.table("youtube_summaries").delete().eq("id", item_id).execute()
 
+def fetch_all_tags():
+    try:
+        res = client.table("youtube_summaries").select("tags").execute()
+        return res.data
+    except Exception as e:
+        print(f"APIError 상세: {e}")  # 전체 에러 내용 출력
+        raise
+
 # ── 페이지 설정 ──────────────────────────────────────
 st.set_page_config(page_title="내 유튜브 요약 대시보드", layout="wide", page_icon="🎬", initial_sidebar_state="auto")
 
