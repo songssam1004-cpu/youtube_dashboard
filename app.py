@@ -26,19 +26,9 @@ def fetch_summaries(page: int, search: str = "", tag: str = ""):
     return res.data, res.count
 
 def fetch_one(item_id: str):
-    """URL 파라미터로 특정 카드 조회 - id 타입 자동 처리"""
-    try:
-        client = get_client()
-        # id가 integer 타입인 경우 int로 변환 시도, UUID면 str 그대로 사용
-        try:
-            parsed_id = int(item_id)
-        except (ValueError, TypeError):
-            parsed_id = str(item_id)
-        res = client.table("youtube_summaries").select("*").eq("id", parsed_id).execute()
-        return res.data[0] if res.data else None
-    except Exception as e:
-        st.warning(f"카드를 불러오는 데 실패했습니다: {e}")
-        return None
+    client = get_client()
+    res = client.table("youtube_summaries").select("*").eq("id", item_id).execute()
+    return res.data[0] if res.data else None
 
 def fetch_all_tags():
     client = get_client()
@@ -131,20 +121,9 @@ for k, v in [("page", 1), ("selected", None), ("confirm_delete", None)]:
 # ── URL 파라미터로 특정 카드 자동 오픈 ──────────────
 params = st.query_params
 if "card" in params and not st.session_state.selected:
-    try:
-        card_id = params["card"]
-        # query_params가 리스트를 반환할 경우 대비
-        if isinstance(card_id, list):
-            card_id = card_id[0]
-        item = fetch_one(str(card_id))
-        if item:
-            st.session_state.selected = item
-        else:
-            st.warning("해당 카드를 찾을 수 없습니다.")
-            st.query_params.clear()
-    except Exception as e:
-        st.warning(f"URL 파라미터 처리 중 오류가 발생했습니다: {e}")
-        st.query_params.clear()
+    item = fetch_one(params["card"])
+    if item:
+        st.session_state.selected = item
 
 # ── 상세 페이지 뷰 ───────────────────────────────────
 if st.session_state.selected:
@@ -180,6 +159,7 @@ if st.session_state.selected:
             yt_short = f"https://youtu.be/{video_id}"
 
             if source == "instagram":
+                # 인스타그램 보기 버튼
                 st.markdown(f"""
                 <div style="display:flex; gap:12px; margin-top:8px; flex-wrap:wrap;">
                     <a href="{yt_url}" target="_blank" style="
@@ -190,6 +170,7 @@ if st.session_state.selected:
                 </div>
                 """, unsafe_allow_html=True)
             else:
+                # 유튜브 보기 버튼
                 brave_url = f"brave://open-url?url={yt_short}"
                 st.markdown(f"""
                 <div style="display:flex; gap:12px; margin-top:8px; flex-wrap:wrap;">
@@ -218,14 +199,17 @@ if st.session_state.selected:
         st.markdown("#### 💬 영상 내용 기반 챗봇")
         st.caption("이 영상의 STT 내용을 기반으로 답변하며, 필요 시 일반 지식도 활용합니다.")
 
+        # 챗봇 세션 초기화 (카드별로 독립)
         chat_key = f"chat_{item['id']}"
         if chat_key not in st.session_state:
             st.session_state[chat_key] = []
 
+        # 대화 기록 출력
         for msg in st.session_state[chat_key]:
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
 
+        # 입력창
         if prompt := st.chat_input("영상에 대해 궁금한 점을 물어보세요..."):
             st.session_state[chat_key].append({"role": "user", "content": prompt})
             with st.chat_message("user"):
@@ -332,6 +316,7 @@ else:
                     if thumb else
                     f'<div class="yt-thumb-placeholder">{thumb_icon}</div>'
                 )
+                source = item.get("source_type", "youtube")
                 badge = "🎬" if source == "youtube" else "📸"
                 badge_color = "#ff0000" if source == "youtube" else "#833ab4"
                 tags_html = "".join(f'<span class="yt-tag">#{t}</span>' for t in tags[:5])
