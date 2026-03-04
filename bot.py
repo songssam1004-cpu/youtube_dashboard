@@ -1,4 +1,5 @@
-import os, re, asyncio, requests, threading
+import os, re, asyncio, requests, threading, tempfile
+import yt_dlp
 from openai import AsyncOpenAI
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
@@ -197,7 +198,49 @@ def get_youtube_transcript(video_id: str) -> str:
             print(f"YouTube 트랜스크립트 오류 (시도 {attempt+1}): {e}")
     return ""
 
-# ── Instagram 데이터 ─────────────────────────────────
+# ── Instagram 릴스 Whisper STT ───────────────────────
+def get_reels_stt(video_url: str) -> str:
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            audio_path = os.path.join(tmpdir, "audio.mp3")
+            ydl_opts = {
+                "format": "bestaudio/best",
+                "outtmpl": os.path.join(tmpdir, "audio.%(ext)s"),
+                "postprocessors": [{
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": "128",
+                }],
+                "quiet": True,
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([video_url])
+
+            # mp3 파일 찾기
+            for f in os.listdir(tmpdir):
+                if f.endswith(".mp3"):
+                    audio_path = os.path.join(tmpdir, f)
+                    break
+
+            # Whisper STT
+            with open(audio_path, "rb") as audio_file:
+                import asyncio
+                loop = asyncio.new_event_loop()
+                transcript = loop.run_until_complete(
+                    ai.audio.transcriptions.create(
+                        model="whisper-1",
+                        file=audio_file,
+                        language="ko",
+                    )
+                )
+                loop.close()
+            print(f"Whisper STT 완료: {transcript.text[:100]}")
+            return transcript.text
+    except Exception as e:
+        print(f"Whisper STT 오류: {e}")
+        return ""
+
+
 def get_instagram_data(url: str) -> dict:
     try:
         run_url = f"https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?token={APIFY_TOKEN}&memory=1024&timeout=120"
