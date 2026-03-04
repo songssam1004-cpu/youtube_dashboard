@@ -146,26 +146,41 @@ if st.session_state.selected:
             st.markdown(" ".join(f"`#{t}`" for t in tags))
         st.markdown(f"📅 {(item.get('created_at') or '')[:10]}")
         if item.get("youtube_url"):
+            source = item.get("source_type", "youtube")
             yt_url = item["youtube_url"]
             video_id = yt_url.split("v=")[-1].split("&")[0] if "v=" in yt_url else yt_url.split("/")[-1].split("?")[0]
             yt_short = f"https://youtu.be/{video_id}"
-            brave_url = f"brave://open-url?url={yt_short}"
-            st.markdown(f"""
-            <div style="display:flex; gap:12px; margin-top:8px; flex-wrap:wrap;">
-                <a href="{yt_url}" target="_blank" style="
-                    background:#ff0000; color:white; padding:8px 16px;
-                    border-radius:8px; text-decoration:none; font-weight:600;">
-                    ▶ YouTube에서 보기
-                </a>
-                <a href="{brave_url}" style="
-                    background:#ff5500; color:white; padding:8px 16px;
-                    border-radius:8px; text-decoration:none; font-weight:600;">
-                    🦁 Brave에서 보기
-                </a>
-            </div>
-            """, unsafe_allow_html=True)
-            st.caption("🔗 URL 직접 복사:")
-            st.code(yt_short, language=None)
+
+            if source == "instagram":
+                # 인스타그램 보기 버튼
+                st.markdown(f"""
+                <div style="display:flex; gap:12px; margin-top:8px; flex-wrap:wrap;">
+                    <a href="{yt_url}" target="_blank" style="
+                        background:#833ab4; color:white; padding:8px 16px;
+                        border-radius:8px; text-decoration:none; font-weight:600;">
+                        📸 인스타그램에서 보기
+                    </a>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                # 유튜브 보기 버튼
+                brave_url = f"brave://open-url?url={yt_short}"
+                st.markdown(f"""
+                <div style="display:flex; gap:12px; margin-top:8px; flex-wrap:wrap;">
+                    <a href="{yt_url}" target="_blank" style="
+                        background:#ff0000; color:white; padding:8px 16px;
+                        border-radius:8px; text-decoration:none; font-weight:600;">
+                        ▶ YouTube에서 보기
+                    </a>
+                    <a href="{brave_url}" style="
+                        background:#ff5500; color:white; padding:8px 16px;
+                        border-radius:8px; text-decoration:none; font-weight:600;">
+                        🦁 Brave에서 보기
+                    </a>
+                </div>
+                """, unsafe_allow_html=True)
+                st.caption("🔗 URL 직접 복사:")
+                st.code(yt_short, language=None)
 
     st.markdown("---")
     tab1, tab2, tab3 = st.tabs(["📝 AI 요약", "📄 전체 STT", "💬 챗봇"])
@@ -286,10 +301,13 @@ else:
                 tags  = item.get("tags") or []
                 date  = (item.get("created_at") or "")[:10]
 
+                source = item.get("source_type", "youtube")
+                thumb_icon = "🎬" if source == "youtube" else "📸"
                 thumb_html = (
-                    f'<img class="yt-thumb" src="{thumb}">'
+                    f'<img class="yt-thumb" src="{thumb}" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">'
+                    f'<div class="yt-thumb-placeholder" style="display:none;">{thumb_icon}</div>'
                     if thumb else
-                    '<div class="yt-thumb-placeholder">🎬</div>'
+                    f'<div class="yt-thumb-placeholder">{thumb_icon}</div>'
                 )
                 source = item.get("source_type", "youtube")
                 badge = "🎬" if source == "youtube" else "📸"
